@@ -1023,7 +1023,7 @@
             
             <!-- Google Sign-In Button -->
             <div id="g_id_onload"
-                data-client_id="YOUR_CLIENT_ID_HERE.apps.googleusercontent.com"
+                data-client_id="493056886974-suc8d0ljpjtarb4cs8td664dm0da7ibn.apps.googleusercontent.com"
                 data-callback="handleCredentialResponse">
             </div>
             <div class="g_id_signin" 
@@ -1814,7 +1814,7 @@
             handleGoogleLogin() {
                 // Initialize Google Identity Services
                 google.accounts.id.initialize({
-                    client_id: 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com', // REPLACE WITH YOUR ACTUAL CLIENT ID
+                    client_id: '493056886974-suc8d0ljpjtarb4cs8td664dm0da7ibn.apps.googleusercontent.com', // REPLACE WITH YOUR ACTUAL CLIENT ID
                     callback: (response) => {
                         // Decode the JWT token
                         const userInfo = this.parseJwt(response.credential);
