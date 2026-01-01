@@ -1,0 +1,2997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="description" content="Track your vehicle expenses, fuel, service, and maintenance with photo receipts">
+    <title>Car Expense Tracker Pro</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚗</text></svg>"> 
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --secondary: #64748b;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --shadow: 0 1px 3px rgba(0,0,0,0.1);
+            --shadow-lg: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        /* Dark Mode Variables */
+        [data-theme="dark"] {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --secondary: #94a3b8;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --error: #f87171;
+            --bg-primary: #1e293b;
+            --bg-secondary: #0f172a;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border: #334155;
+            --shadow: 0 1px 3px rgba(0,0,0,0.3);
+            --shadow-lg: 0 4px 6px rgba(0,0,0,0.4);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            padding-bottom: env(safe-area-inset-bottom);
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg-primary);
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow);
+        }
+
+        .header h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.25rem;
+            color: var(--text-primary);
+            transition: transform 0.2s;
+        }
+
+        .icon-btn:active {
+            transform: scale(0.9);
+        }
+
+        .sync-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .sync-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+
+        .sync-indicator.syncing {
+            background: var(--warning);
+            animation: pulse 1.5s infinite;
+        }
+
+        .sync-indicator.offline {
+            background: var(--error);
+        }
+
+        /* Main Content */
+        .main-content {
+            padding: 1rem;
+            padding-bottom: 100px;
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        /* Screens */
+        .screen {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        /* Vehicle Cards */
+        .vehicle-card {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 2px solid var(--border);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .vehicle-card:active {
+            transform: scale(0.98);
+        }
+
+        .vehicle-card.selected {
+            border-color: var(--primary);
+            background: rgba(37, 99, 235, 0.1);
+        }
+
+        .vehicle-name {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .vehicle-details {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .form-hint {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .form-error {
+            font-size: 0.75rem;
+            color: var(--error);
+            margin-top: 0.25rem;
+        }
+
+        select.form-input {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 1.25rem;
+            padding-right: 2.5rem;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        /* Photo Upload */
+        .photo-upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 2rem 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--bg-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .photo-upload-area:hover {
+            border-color: var(--primary);
+            background: rgba(37, 99, 235, 0.05);
+        }
+
+        .photo-upload-area.dragover {
+            border-color: var(--primary);
+            background: rgba(37, 99, 235, 0.1);
+        }
+
+        .photo-preview-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .photo-preview {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            cursor: pointer;
+        }
+
+        .photo-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .photo-preview-remove {
+            position: absolute;
+            top: 0.25rem;
+            right: 0.25rem;
+            background: var(--error);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 0.875rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            min-height: 44px;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--error);
+            color: white;
+        }
+
+        .btn-block {
+            width: 100%;
+            display: flex;
+        }
+
+        .btn-large {
+            font-size: 1.125rem;
+            padding: 1rem 2rem;
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-primary);
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-around;
+            padding: 0.5rem 0;
+            padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.5rem 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: color 0.2s;
+            min-width: 60px;
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+        }
+
+        .nav-icon {
+            font-size: 1.5rem;
+        }
+
+        /* Timeline */
+        .timeline {
+            position: relative;
+            padding-left: 2rem;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 0.5rem;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--border);
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .timeline-item:active {
+            transform: translateX(4px);
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -1.5rem;
+            top: 1rem;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--primary);
+            border: 2px solid var(--bg-secondary);
+        }
+
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 0.5rem;
+        }
+
+        .timeline-title {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .timeline-cost {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .timeline-meta {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .timeline-group {
+            margin-bottom: 2rem;
+        }
+
+        .timeline-group-header {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: var(--bg-primary);
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .quick-action {
+            background: var(--bg-primary);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid var(--border);
+        }
+
+        .quick-action:active {
+            transform: scale(0.95);
+        }
+
+        .quick-action-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .quick-action-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        /* Reminders */
+        .reminder-card {
+            background: var(--bg-primary);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            border-left: 4px solid var(--warning);
+            box-shadow: var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .reminder-card.urgent {
+            border-left-color: var(--error);
+        }
+
+        .reminder-card.completed {
+            border-left-color: var(--success);
+            opacity: 0.7;
+        }
+
+        .reminder-whatsapp-btn {
+            background: #25D366;
+            color: white;
+            border: none;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .empty-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .empty-text {
+            font-size: 0.875rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Login Screen */
+        .login-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .login-icon {
+            font-size: 5rem;
+            margin-bottom: 1rem;
+        }
+
+        .login-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .login-subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: flex-end;
+            animation: fadeIn 0.2s;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-primary);
+            border-radius: 16px 16px 0 0;
+            padding: 1.5rem;
+            max-height: 90vh;
+            overflow-y: auto;
+            width: 100%;
+            animation: slideUp 0.3s;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.25rem;
+            color: var(--text-secondary);
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Filters */
+        .filter-chips {
+            display: flex;
+            gap: 0.5rem;
+            overflow-x: auto;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+            scrollbar-width: none;
+        }
+
+        .filter-chips::-webkit-scrollbar {
+            display: none;
+        }
+
+        .filter-chip {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: var(--bg-primary);
+            font-size: 0.875rem;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-chip.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Reports */
+        .report-section {
+            margin-bottom: 2rem;
+        }
+
+        .report-header {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .report-table {
+            width: 100%;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .report-table tr {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .report-table tr:last-child {
+            border-bottom: none;
+        }
+
+        .report-table td {
+            padding: 0.75rem;
+        }
+
+        .report-table td:first-child {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .report-table td:last-child {
+            font-weight: 600;
+            text-align: right;
+        }
+
+        /* Charts */
+        .chart-container {
+            background: var(--bg-primary);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: var(--shadow);
+        }
+
+        .chart-title {
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .chart-bar {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .chart-label {
+            width: 100px;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .chart-bar-track {
+            flex: 1;
+            height: 24px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 0 0.5rem;
+        }
+
+        .chart-bar-fill {
+            height: 100%;
+            background: var(--primary);
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            padding: 0 0.5rem;
+            font-size: 0.75rem;
+            color: white;
+            font-weight: 600;
+        }
+
+        .chart-value {
+            font-size: 0.875rem;
+            font-weight: 600;
+            min-width: 60px;
+            text-align: right;
+        }
+
+        /* Driver List */
+        .driver-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .driver-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .driver-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .driver-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+
+        .driver-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* Toggle Switch for Dark Mode */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--border);
+            transition: 0.3s;
+            border-radius: 28px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: var(--primary);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(22px);
+        }
+
+        /* Full Screen Photo Viewer */
+        .photo-viewer {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .photo-viewer.active {
+            display: flex;
+        }
+
+        .photo-viewer img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+        }
+
+        .photo-viewer-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            font-size: 2rem;
+            color: white;
+            cursor: pointer;
+            background: rgba(0, 0, 0, 0.5);
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Utility Classes */
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .mt-1 { margin-top: 0.5rem; }
+        .mt-2 { margin-top: 1rem; }
+        .mb-1 { margin-bottom: 0.5rem; }
+        .mb-2 { margin-bottom: 1rem; }
+        .hidden { display: none !important; }
+
+        /* Responsive */
+        @media (min-width: 768px) {
+            .main-content {
+                max-width: 768px;
+            }
+            .bottom-nav {
+                max-width: 768px;
+                left: 50%;
+                transform: translateX(-50%);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div>
+            <h1 id="headerTitle">Car Expense Tracker Pro</h1>
+            <div id="vehicleSelector" class="hidden" style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                <span id="currentVehicleName">No Vehicle</span>
+            </div>
+        </div>
+        <div class="header-actions">
+            <div class="sync-status">
+                <div class="sync-indicator" id="syncIndicator"></div>
+            </div>
+            <button class="icon-btn" onclick="app.toggleTheme()" title="Toggle dark mode">
+                <span id="themeIcon">🌙</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-content" id="mainContent">
+        
+        <!-- Login Screen -->
+        <div id="loginScreen" class="screen login-screen">
+            <div class="login-icon">🚗</div>
+            <h1 class="login-title">Car Expense Tracker Pro</h1>
+            <p class="login-subtitle">Track fuel, service, and expenses with photo receipts</p>
+            
+            <!-- Google Sign-In Button -->
+            <div id="g_id_onload"
+                data-client_id="493056886974-suc8d0ljpjtarb4cs8td664dm0da7ibn.apps.googleusercontent.com"
+                data-callback="handleCredentialResponse">
+            </div>
+            <div class="g_id_signin" 
+                data-type="standard"
+                data-size="large"
+                data-theme="outline"
+                data-text="sign_in_with"
+                data-shape="rectangular"
+                data-logo_alignment="left">
+            </div>
+            
+            <p style="margin-top: 1rem; font-size: 0.875rem; color: var(--text-secondary);">
+                Photo receipts • Driver management • Fuel trends • Dark mode
+            </p>
+        </div>
+
+        <!-- Vehicle Selection Screen -->
+        <div id="vehicleScreen" class="screen">
+            <div class="card">
+                <h2 class="card-title">My Vehicles</h2>
+                <div id="vehicleList"></div>
+                <button class="btn btn-primary btn-block mt-2" onclick="app.showAddVehicle()">
+                    <span>➕</span> Add Vehicle
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard Screen -->
+        <div id="dashboardScreen" class="screen">
+            <div class="stats-grid" id="dashboardStats">
+                <!-- Stats will be populated here -->
+            </div>
+
+            <div class="card">
+                <h2 class="card-title">Quick Actions</h2>
+                <div class="quick-actions">
+                    <div class="quick-action" onclick="app.showAddFuel()">
+                        <div class="quick-action-icon">⛽</div>
+                        <div class="quick-action-label">Add Fuel</div>
+                    </div>
+                    <div class="quick-action" onclick="app.showAddService()">
+                        <div class="quick-action-icon">🔧</div>
+                        <div class="quick-action-label">Service</div>
+                    </div>
+                    <div class="quick-action" onclick="app.showAddExpense()">
+                        <div class="quick-action-icon">💰</div>
+                        <div class="quick-action-label">Expense</div>
+                    </div>
+                    <div class="quick-action" onclick="app.showDrivers()">
+                        <div class="quick-action-icon">👤</div>
+                        <div class="quick-action-label">Drivers</div>
+                    </div>
+                    <div class="quick-action" onclick="app.showScreen('reportsScreen'); app.showReportTab('trends')">
+                        <div class="quick-action-icon">📊</div>
+                        <div class="quick-action-label">Trends</div>
+                    </div>
+                    <div class="quick-action" onclick="app.showAddReminder()">
+                        <div class="quick-action-icon">🔔</div>
+                        <div class="quick-action-label">Reminders</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title">Upcoming Reminders</h2>
+                <div id="dashboardReminders"></div>
+            </div>
+        </div>
+
+        <!-- Timeline Screen -->
+        <div id="timelineScreen" class="screen">
+            <div class="filter-chips" id="timelineFilters">
+                <div class="filter-chip active" data-filter="all" onclick="app.filterTimeline('all')">All</div>
+                <div class="filter-chip" data-filter="fuel" onclick="app.filterTimeline('fuel')">⛽ Fuel</div>
+                <div class="filter-chip" data-filter="service" onclick="app.filterTimeline('service')">🔧 Service</div>
+                <div class="filter-chip" data-filter="expense" onclick="app.filterTimeline('expense')">💰 Expense</div>
+            </div>
+            <div id="timelineContent" class="timeline"></div>
+        </div>
+
+        <!-- Reports Screen -->
+        <div id="reportsScreen" class="screen">
+            <div class="filter-chips">
+                <div class="filter-chip active" data-tab="summary" onclick="app.showReportTab('summary')">Summary</div>
+                <div class="filter-chip" data-tab="trends" onclick="app.showReportTab('trends')">Fuel Trends</div>
+                <div class="filter-chip" data-tab="comparison" onclick="app.showReportTab('comparison')">Service Cost</div>
+            </div>
+
+            <div id="reportSummary" class="report-section">
+                <div class="stats-grid" id="reportStats"></div>
+                <div id="reportDetails"></div>
+            </div>
+
+            <div id="reportTrends" class="report-section hidden">
+                <div class="chart-container">
+                    <div class="chart-title">📈 Fuel Price Trends (Last 10 Entries)</div>
+                    <div id="fuelTrendChart"></div>
+                </div>
+            </div>
+
+            <div id="reportComparison" class="report-section hidden">
+                <div class="chart-container">
+                    <div class="chart-title">🔧 Service Cost Comparison by Type</div>
+                    <div id="serviceComparisonChart"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Drivers Screen -->
+        <div id="driversScreen" class="screen">
+            <div class="card">
+                <h2 class="card-title">Manage Drivers</h2>
+                <div id="driverList" class="driver-list"></div>
+                <button class="btn btn-primary btn-block mt-2" onclick="app.showAddDriver()">
+                    <span>➕</span> Add Driver
+                </button>
+            </div>
+        </div>
+
+        <!-- Settings Screen -->
+        <div id="settingsScreen" class="screen">
+            <div class="card">
+                <h2 class="card-title">Account</h2>
+                <p id="userEmail" style="color: var(--text-secondary); margin-bottom: 1rem;"></p>
+                <button class="btn btn-secondary btn-block" onclick="app.manualSync()">
+                    <span>🔄</span> Sync Now
+                </button>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title">Appearance</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Dark Mode</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="darkModeToggle" onchange="app.toggleTheme()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title">WhatsApp Notifications</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <span>Enable WhatsApp Reminders</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="whatsappToggle" onchange="app.toggleWhatsApp()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div id="whatsappNumberGroup" style="display: none;">
+                    <input type="tel" class="form-input" id="whatsappNumber" placeholder="WhatsApp Number (e.g., +919876543210)">
+                    <p style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                        Include country code (e.g., +91 for India)
+                    </p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title">Manage</h2>
+                <button class="btn btn-secondary btn-block mb-1" onclick="app.showScreen('vehicleScreen')">
+                    <span>🚗</span> Manage Vehicles
+                </button>
+                <button class="btn btn-secondary btn-block mb-1" onclick="app.showDrivers()">
+                    <span>👤</span> Manage Drivers
+                </button>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title">Data</h2>
+                <button class="btn btn-secondary btn-block mb-1" onclick="app.exportData()">
+                    <span>📊</span> Export Data (CSV)
+                </button>
+                <button class="btn btn-danger btn-block" onclick="app.handleLogout()">
+                    <span>🚪</span> Sign Out
+                </button>
+            </div>
+
+            <div style="text-align: center; margin-top: 2rem; color: var(--text-secondary); font-size: 0.875rem;">
+                <p>Car Expense Tracker Pro v2.0</p>
+                <p>Made with ❤️ for Indian users</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav" id="bottomNav" style="display: none;">
+        <div class="nav-item" data-screen="dashboardScreen" onclick="app.showScreen('dashboardScreen')">
+            <span class="nav-icon">📊</span>
+            <span>Dashboard</span>
+        </div>
+        <div class="nav-item" data-screen="timelineScreen" onclick="app.showScreen('timelineScreen')">
+            <span class="nav-icon">📅</span>
+            <span>Timeline</span>
+        </div>
+        <div class="nav-item" data-screen="addScreen" onclick="app.showAddMenu()">
+            <span class="nav-icon" style="font-size: 2rem;">➕</span>
+            <span>Add</span>
+        </div>
+        <div class="nav-item" data-screen="reportsScreen" onclick="app.showScreen('reportsScreen')">
+            <span class="nav-icon">📈</span>
+            <span>Reports</span>
+        </div>
+        <div class="nav-item" data-screen="settingsScreen" onclick="app.showScreen('settingsScreen')">
+            <span class="nav-icon">⚙️</span>
+            <span>Settings</span>
+        </div>
+    </div>
+
+    <!-- MODALS START HERE -->
+
+    <!-- Add Menu Modal -->
+    <div id="addMenuModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add Entry</h2>
+                <span class="modal-close" onclick="app.closeModal('addMenuModal')">✕</span>
+            </div>
+            <button class="btn btn-primary btn-block mb-1" onclick="app.showAddFuel()">
+                <span>⛽</span> Add Fuel Entry
+            </button>
+            <button class="btn btn-primary btn-block mb-1" onclick="app.showAddService()">
+                <span>🔧</span> Add Service Record
+            </button>
+            <button class="btn btn-primary btn-block mb-1" onclick="app.showAddExpense()">
+                <span>💰</span> Add Other Expense
+            </button>
+            <button class="btn btn-primary btn-block" onclick="app.showAddReminder()">
+                <span>🔔</span> Add Reminder
+            </button>
+        </div>
+    </div>
+
+    <!-- Add Vehicle Modal -->
+    <div id="addVehicleModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add Vehicle</h2>
+                <span class="modal-close" onclick="app.closeModal('addVehicleModal')">✕</span>
+            </div>
+            <form id="vehicleForm" onsubmit="app.saveVehicle(event)">
+                <div class="form-group">
+                    <label class="form-label">Vehicle Name *</label>
+                    <input type="text" class="form-input" id="vehicleName" placeholder="e.g., Honda City" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Registration Number</label>
+                    <input type="text" class="form-input" id="vehicleRegNo" placeholder="e.g., MH-01-AB-1234">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fuel Type *</label>
+                    <select class="form-input" id="vehicleFuelType" required>
+                        <option value="">Select fuel type</option>
+                        <option value="Petrol">Petrol</option>
+                        <option value="Diesel">Diesel</option>
+                        <option value="CNG">CNG</option>
+                        <option value="Electric">Electric</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Initial Odometer (KM) *</label>
+                    <input type="number" class="form-input" id="vehicleOdometer" placeholder="e.g., 5000" required min="0">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Save Vehicle</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Driver Modal -->
+    <div id="addDriverModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add Driver</h2>
+                <span class="modal-close" onclick="app.closeModal('addDriverModal')">✕</span>
+            </div>
+            <form id="driverForm" onsubmit="app.saveDriver(event)">
+                <div class="form-group">
+                    <label class="form-label">Driver Name *</label>
+                    <input type="text" class="form-input" id="driverName" placeholder="e.g., Rajesh Kumar" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Phone Number</label>
+                    <input type="tel" class="form-input" id="driverPhone" placeholder="e.g., +919876543210">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Save Driver</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Fuel Modal with Photo Upload -->
+    <div id="addFuelModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add Fuel Entry</h2>
+                <span class="modal-close" onclick="app.closeModal('addFuelModal')">✕</span>
+            </div>
+            <form id="fuelForm" onsubmit="app.saveFuel(event)">
+                <div class="form-group">
+                    <label class="form-label">Date *</label>
+                    <input type="date" class="form-input" id="fuelDate" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Odometer Reading (KM) *</label>
+                    <input type="number" class="form-input" id="fuelOdometer" placeholder="Current reading" required min="0">
+                    <div class="form-hint" id="fuelOdometerHint"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Driver</label>
+                    <select class="form-input" id="fuelDriver">
+                        <option value="">Select driver</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fuel Type *</label>
+                    <select class="form-input" id="fuelType" required>
+                        <option value="">Select fuel type</option>
+                        <option value="Petrol">Petrol</option>
+                        <option value="Diesel">Diesel</option>
+                        <option value="CNG">CNG</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Quantity (Litres) *</label>
+                    <input type="number" class="form-input" id="fuelQuantity" placeholder="e.g., 30" required min="0" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Price per Litre (₹) *</label>
+                    <input type="number" class="form-input" id="fuelPrice" placeholder="e.g., 105.50" required min="0" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Total Cost (₹)</label>
+                    <input type="number" class="form-input" id="fuelTotalCost" readonly>
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="fuelFullTank">
+                    <label for="fuelFullTank">Full Tank</label>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fuel Station</label>
+                    <input type="text" class="form-input" id="fuelStation" placeholder="e.g., Indian Oil">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">📷 Receipt Photo (Optional)</label>
+                    <div class="photo-upload-area" onclick="document.getElementById('fuelPhotoInput').click()" id="fuelPhotoArea">
+                        <div>📷 Tap to add receipt photo</div>
+                        <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                            or drag and drop here
+                        </div>
+                    </div>
+                    <input type="file" id="fuelPhotoInput" accept="image/*" capture="environment" style="display: none;" onchange="app.handlePhotoUpload(event, 'fuel')">
+                    <div id="fuelPhotoPreview" class="photo-preview-container"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Notes</label>
+                    <input type="text" class="form-input" id="fuelNotes" placeholder="Any additional notes">
+                </div>
+                <button type="submit" class="btn btn-success btn-block">Save Fuel Entry</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Service Modal with Photo Upload -->
+    <div id="addServiceModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add Service Record</h2>
+                <span class="modal-close" onclick="app.closeModal('addServiceModal')">✕</span>
+            </div>
+            <form id="serviceForm" onsubmit="app.saveService(event)">
+                <div class="form-group">
+                    <label class="form-label">Date *</label>
+                    <input type="date" class="form-input" id="serviceDate" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Odometer Reading (KM) *</label>
+                    <input type="number" class="form-input" id="serviceOdometer" placeholder="Current reading" required min="0">
+                    <div class="form-hint" id="serviceOdometerHint"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Driver</label>
+                    <select class="form-input" id="serviceDriver">
+                        <option value="">Select driver</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Service Type *</label>
+                    <select class="form-input" id="serviceType" required>
+                        <option value="">Select service type</option>
+                        <option value="Oil Change">Oil Change</option>
+                        <option value="General Service">General Service</option>
+                        <option value="Brake Service">Brake Service</option>
+                        <option value="Tyre Rotation">Tyre Rotation</option>
+                        <option value="Battery">Battery</option>
+                        <option value="AC Service">AC Service</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Service Center</label>
+                    <input type="text" class="form-input" id="serviceCenter" placeholder="e.g., Authorized Service Center">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Total Cost (₹) *</label>
+                    <input type="number" class="form-input" id="serviceCost" placeholder="e.g., 5000" required min="0" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">📷 Invoice/Receipt Photos (Optional)</label>
+                    <div class="photo-upload-area" onclick="document.getElementById('servicePhotoInput').click()" id="servicePhotoArea">
+                        <div>📷 Tap to add invoice photos</div>
+                        <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                            You can add multiple photos
+                        </div>
+                    </div>
+                    <input type="file" id="servicePhotoInput" accept="image/*" capture="environment" multiple style="display: none;" onchange="app.handlePhotoUpload(event, 'service')">
+                    <div id="servicePhotoPreview" class="photo-preview-container"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Notes</label>
+                    <input type="text" class="form-input" id="serviceNotes" placeholder="Any additional details">
+                </div>
+                <button type="submit" class="btn btn-success btn-block">Save Service Record</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Expense Modal with Photo Upload -->
+    <div id="addExpenseModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add Expense</h2>
+                <span class="modal-close" onclick="app.closeModal('addExpenseModal')">✕</span>
+            </div>
+            <form id="expenseForm" onsubmit="app.saveExpense(event)">
+                <div class="form-group">
+                    <label class="form-label">Date *</label>
+                    <input type="date" class="form-input" id="expenseDate" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Category *</label>
+                    <select class="form-input" id="expenseCategory" required>
+                        <option value="">Select category</option>
+                        <option value="Insurance">Insurance</option>
+                        <option value="Tax">Road Tax</option>
+                        <option value="Parking">Parking</option>
+                        <option value="Toll">Toll</option>
+                        <option value="Fine">Fine/Penalty</option>
+                        <option value="PUC">PUC</option>
+                        <option value="Accessories">Accessories</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Amount (₹) *</label>
+                    <input type="number" class="form-input" id="expenseAmount" placeholder="e.g., 2000" required min="0" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">📷 Receipt Photo (Optional)</label>
+                    <div class="photo-upload-area" onclick="document.getElementById('expensePhotoInput').click()" id="expensePhotoArea">
+                        <div>📷 Tap to add receipt photo</div>
+                        <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                            or drag and drop here
+                        </div>
+                    </div>
+                    <input type="file" id="expensePhotoInput" accept="image/*" capture="environment" style="display: none;" onchange="app.handlePhotoUpload(event, 'expense')">
+                    <div id="expensePhotoPreview" class="photo-preview-container"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Notes</label>
+                    <input type="text" class="form-input" id="expenseNotes" placeholder="Any additional details">
+                </div>
+                <button type="submit" class="btn btn-success btn-block">Save Expense</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Reminder Modal -->
+    <div id="addReminderModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add Reminder</h2>
+                <span class="modal-close" onclick="app.closeModal('addReminderModal')">✕</span>
+            </div>
+            <form id="reminderForm" onsubmit="app.saveReminder(event)">
+                <div class="form-group">
+                    <label class="form-label">Reminder Type *</label>
+                    <select class="form-input" id="reminderType" required>
+                        <option value="">Select type</option>
+                        <option value="PUC">PUC Renewal</option>
+                        <option value="Insurance">Insurance Renewal</option>
+                        <option value="Service">Service Due</option>
+                        <option value="Custom">Custom</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Due Date</label>
+                    <input type="date" class="form-input" id="reminderDate">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Due at KM</label>
+                    <input type="number" class="form-input" id="reminderKM" placeholder="e.g., 10000" min="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Notes</label>
+                    <input type="text" class="form-input" id="reminderNotes" placeholder="Additional details">
+                </div>
+                <button type="submit" class="btn btn-success btn-block">Save Reminder</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Entry Detail Modal -->
+    <div id="entryDetailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="detailTitle">Entry Details</h2>
+                <span class="modal-close" onclick="app.closeModal('entryDetailModal')">✕</span>
+            </div>
+            <div id="detailContent"></div>
+            <div id="detailPhotos" class="photo-preview-container" style="margin-top: 1rem;"></div>
+            <button class="btn btn-danger btn-block mt-2" onclick="app.deleteEntry()">Delete Entry</button>
+        </div>
+    </div>
+
+    <!-- Full Screen Photo Viewer -->
+    <div id="photoViewer" class="photo-viewer">
+        <span class="photo-viewer-close" onclick="app.closePhotoViewer()">✕</span>
+        <img id="photoViewerImg" src="" alt="Full screen photo">
+    </div>
+
+    <script>
+        // Main Application Object
+        const app = {
+            currentUser: null,
+            currentVehicle: null,
+            vehicles: [],
+            fuelEntries: [],
+            serviceEntries: [],
+            expenses: [],
+            reminders: [],
+            drivers: [],
+            isOnline: navigator.onLine,
+            syncPending: false,
+            currentFilter: 'all',
+            selectedEntry: null,
+            currentPhotos: { fuel: [], service: [], expense: [] },
+
+            // Initialize the app
+            init() {
+                this.setupEventListeners();
+                this.checkAuthStatus();
+                this.setupAutoSync();
+                this.updateSyncStatus();
+                this.loadTheme();
+                this.loadWhatsAppSettings();
+                
+                const today = new Date().toISOString().split('T')[0];
+                document.querySelectorAll('input[type="date"]').forEach(input => {
+                    if (!input.value) input.value = today;
+                });
+
+                document.getElementById('fuelQuantity')?.addEventListener('input', () => this.calculateFuelCost());
+                document.getElementById('fuelPrice')?.addEventListener('input', () => this.calculateFuelCost());
+
+                this.setupPhotoDropZones();
+            },
+
+            setupEventListeners() {
+                window.addEventListener('online', () => {
+                    this.isOnline = true;
+                    this.updateSyncStatus();
+                    this.syncData();
+                });
+
+                window.addEventListener('offline', () => {
+                    this.isOnline = false;
+                    this.updateSyncStatus();
+                });
+
+                document.querySelectorAll('.modal').forEach(modal => {
+                    modal.addEventListener('click', (e) => {
+                        if (e.target === modal) {
+                            modal.classList.remove('active');
+                        }
+                    });
+                });
+            },
+
+            // Photo Upload Setup
+            setupPhotoDropZones() {
+                ['fuel', 'service', 'expense'].forEach(type => {
+                    const area = document.getElementById(`${type}PhotoArea`);
+                    if (area) {
+                        ['dragover', 'dragenter'].forEach(evt => {
+                            area.addEventListener(evt, (e) => {
+                                e.preventDefault();
+                                area.classList.add('dragover');
+                            });
+                        });
+                        
+                        ['dragleave', 'dragend'].forEach(evt => {
+                            area.addEventListener(evt, () => {
+                                area.classList.remove('dragover');
+                            });
+                        });
+                        
+                        area.addEventListener('drop', (e) => {
+                            e.preventDefault();
+                            area.classList.remove('dragover');
+                            const files = e.dataTransfer.files;
+                            if (files.length > 0) {
+                                this.handlePhotoUpload({target: {files}}, type);
+                            }
+                        });
+                    }
+                });
+            },
+
+            handlePhotoUpload(event, entryType) {
+                const files = event.target.files;
+                if (!files.length) return;
+
+                const previewContainer = document.getElementById(`${entryType}PhotoPreview`);
+                
+                Array.from(files).forEach(file => {
+                    if (!file.type.startsWith('image/')) return;
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const photoData = {
+                            id: Date.now() + Math.random(),
+                            data: e.target.result,
+                            name: file.name,
+                            size: file.size
+                        };
+
+                        this.currentPhotos[entryType].push(photoData);
+
+                        const preview = document.createElement('div');
+                        preview.className = 'photo-preview';
+                        preview.innerHTML = `
+                            <img src="${photoData.data}" alt="Receipt" onclick="app.viewPhoto('${photoData.data}')">
+                            <button class="photo-preview-remove" onclick="event.stopPropagation(); app.removePhoto('${entryType}', ${photoData.id})">×</button>
+                        `;
+                        previewContainer.appendChild(preview);
+                    };
+                    reader.readAsDataURL(file);
+                });
+
+                event.target.value = '';
+            },
+
+            removePhoto(entryType, photoId) {
+                this.currentPhotos[entryType] = this.currentPhotos[entryType].filter(p => p.id !== photoId);
+                
+                const previewContainer = document.getElementById(`${entryType}PhotoPreview`);
+                previewContainer.innerHTML = '';
+                
+                this.currentPhotos[entryType].forEach(photo => {
+                    const preview = document.createElement('div');
+                    preview.className = 'photo-preview';
+                    preview.innerHTML = `
+                        <img src="${photo.data}" alt="Receipt" onclick="app.viewPhoto('${photo.data}')">
+                        <button class="photo-preview-remove" onclick="event.stopPropagation(); app.removePhoto('${entryType}', ${photo.id})">×</button>
+                    `;
+                    previewContainer.appendChild(preview);
+                });
+            },
+
+            viewPhoto(photoData) {
+                document.getElementById('photoViewerImg').src = photoData;
+                document.getElementById('photoViewer').classList.add('active');
+            },
+
+            closePhotoViewer() {
+                document.getElementById('photoViewer').classList.remove('active');
+            },
+
+            // Dark Mode
+            toggleTheme() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+                
+                const themeIcon = document.getElementById('themeIcon');
+                const darkModeToggle = document.getElementById('darkModeToggle');
+                
+                if (newTheme === 'dark') {
+                    themeIcon.textContent = '☀️';
+                    if (darkModeToggle) darkModeToggle.checked = true;
+                } else {
+                    themeIcon.textContent = '🌙';
+                    if (darkModeToggle) darkModeToggle.checked = false;
+                }
+            },
+
+            loadTheme() {
+                const savedTheme = localStorage.getItem('theme') || 'light';
+                document.documentElement.setAttribute('data-theme', savedTheme);
+                const themeIcon = document.getElementById('themeIcon');
+                const darkModeToggle = document.getElementById('darkModeToggle');
+                
+                if (savedTheme === 'dark') {
+                    themeIcon.textContent = '☀️';
+                    if (darkModeToggle) darkModeToggle.checked = true;
+                } else {
+                    themeIcon.textContent = '🌙';
+                    if (darkModeToggle) darkModeToggle.checked = false;
+                }
+            },
+
+            // WhatsApp Integration
+            toggleWhatsApp() {
+                const toggle = document.getElementById('whatsappToggle');
+                const numberGroup = document.getElementById('whatsappNumberGroup');
+                const numberInput = document.getElementById('whatsappNumber');
+                
+                if (toggle.checked) {
+                    numberGroup.style.display = 'block';
+                    const saved = localStorage.getItem('whatsappNumber');
+                    if (saved) numberInput.value = saved;
+                    
+                    numberInput.addEventListener('change', () => {
+                        localStorage.setItem('whatsappNumber', numberInput.value);
+                        localStorage.setItem('whatsappEnabled', 'true');
+                    });
+                } else {
+                    numberGroup.style.display = 'none';
+                    localStorage.setItem('whatsappEnabled', 'false');
+                }
+            },
+
+            loadWhatsAppSettings() {
+                const enabled = localStorage.getItem('whatsappEnabled') === 'true';
+                const toggle = document.getElementById('whatsappToggle');
+                const numberGroup = document.getElementById('whatsappNumberGroup');
+                const numberInput = document.getElementById('whatsappNumber');
+                
+                if (toggle && enabled) {
+                    toggle.checked = true;
+                    if (numberGroup) numberGroup.style.display = 'block';
+                    const saved = localStorage.getItem('whatsappNumber');
+                    if (saved && numberInput) numberInput.value = saved;
+                }
+            },
+
+            sendWhatsAppReminder(reminder) {
+                const whatsappEnabled = localStorage.getItem('whatsappEnabled') === 'true';
+                const whatsappNumber = localStorage.getItem('whatsappNumber');
+                
+                if (!whatsappEnabled || !whatsappNumber) {
+                    alert('Please enable WhatsApp reminders and add your number in Settings');
+                    return;
+                }
+
+                const vehicleName = this.currentVehicle?.name || 'Your Vehicle';
+                let message = `🚗 *Car Expense Tracker Reminder*\n\n`;
+                message += `*${reminder.type}* is due`;
+                
+                if (reminder.dueDate) {
+                    message += ` on *${new Date(reminder.dueDate).toLocaleDateString('en-IN')}*`;
+                }
+                
+                if (reminder.dueKM) {
+                    message += ` at *${reminder.dueKM} KM*`;
+                }
+                
+                message += `\n\n*Vehicle:* ${vehicleName}`;
+                
+                if (reminder.notes) {
+                    message += `\n*Notes:* ${reminder.notes}`;
+                }
+                
+                const url = `https://wa.me/${whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+                window.open(url, '_blank');
+            },
+
+            checkAuthStatus() {
+                const user = localStorage.getItem('carExpenseUser');
+                if (user) {
+                    this.currentUser = JSON.parse(user);
+                    this.loadData();
+                    this.showVehicleSelection();
+                } else {
+                    this.showScreen('loginScreen');
+                }
+            },
+
+            handleGoogleLogin() {
+                console.log('🔄 Starting Google Sign-In...');
+                
+                if (typeof google === 'undefined') {
+                    alert('⚠️ Google Sign-In library not loaded yet. Please wait a moment and try again.');
+                    console.error('Google library not loaded');
+                    return;
+                }
+
+                try {
+                    // Initialize Google Identity Services
+                    google.accounts.id.initialize({
+                        client_id: '493056886974-suc8d0ljpjtarb4cs8td664dm0da7ibn.apps.googleusercontent.com',
+                        callback: handleCredentialResponse,
+                        auto_select: false,
+                        cancel_on_tap_outside: false
+                    });
+
+                    // Show the One Tap dialog
+                    google.accounts.id.prompt((notification) => {
+                        if (notification.isNotDisplayed()) {
+                            console.log('⚠️ One Tap not displayed:', notification.getNotDisplayedReason());
+                        }
+                        if (notification.isSkippedMoment()) {
+                            console.log('⚠️ One Tap skipped:', notification.getSkippedReason());
+                        }
+                    });
+                    
+                    console.log('✅ Google Sign-In initialized');
+                } catch (error) {
+                    console.error('❌ Error initializing Google Sign-In:', error);
+                    alert('Error: ' + error.message);
+                }
+            },
+
+            parseJwt(token) {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                return JSON.parse(jsonPayload);
+            },
+
+            // Initialize Google Sheets API with OAuth token from Google Identity
+            async initializeGoogleSheets(credential) {
+                console.log('🔄 Initializing Google Sheets API...');
+                
+                try {
+                    // Request access token using the ID token
+                    const tokenClient = google.accounts.oauth2.initTokenClient({
+                        client_id: '493056886974-suc8d0ljpjtarb4cs8td664dm0da7ibn.apps.googleusercontent.com',
+                        scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file',
+                        callback: async (response) => {
+                            if (response.error) {
+                                console.error('❌ Token error:', response.error);
+                                alert('Could not get access to Google Sheets. App will work offline only.');
+                                this.showVehicleSelection();
+                                return;
+                            }
+                            
+                            console.log('✅ Access token received');
+                            this.accessToken = response.access_token;
+                            
+                            // Load Google API client
+                            await new Promise((resolve) => {
+                                gapi.load('client', resolve);
+                            });
+                            
+                            // Initialize the client
+                            await gapi.client.init({
+                                discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4'],
+                            });
+                            
+                            // Set the access token
+                            gapi.client.setToken({ access_token: response.access_token });
+                            
+                            console.log('✅ Google Sheets API initialized');
+                            
+                            // Create or open spreadsheet
+                            await this.createOrOpenSpreadsheet();
+                            
+                            // Show vehicle selection
+                            this.showVehicleSelection();
+                        },
+                    });
+                    
+                    // Request access token
+                    tokenClient.requestAccessToken();
+                    
+                } catch (error) {
+                    console.error('❌ Error initializing Google Sheets:', error);
+                    alert('Google Sheets sync unavailable. App will work offline.');
+                    this.showVehicleSelection();
+                }
+            },
+
+            processUser(user) {
+                const profile = user.getBasicProfile();
+                this.currentUser = {
+                    email: profile.getEmail(),
+                    name: profile.getName(),
+                    id: profile.getId(),
+                    accessToken: user.getAuthResponse().access_token
+                };
+                localStorage.setItem('carExpenseUser', JSON.stringify(this.currentUser));
+                this.createOrOpenSpreadsheet();
+                this.showVehicleSelection();
+            },
+
+            handleLogout() {
+                if (confirm('Are you sure you want to sign out?')) {
+                    localStorage.clear();
+                    this.currentUser = null;
+                    this.currentVehicle = null;
+                    this.vehicles = [];
+                    document.getElementById('bottomNav').style.display = 'none';
+                    this.showScreen('loginScreen');
+                }
+            },
+
+            showVehicleSelection() {
+                this.loadData();
+                const vehicleList = document.getElementById('vehicleList');
+                
+                if (this.vehicles.length === 0) {
+                    vehicleList.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-icon">🚗</div>
+                            <div class="empty-title">No vehicles yet</div>
+                            <div class="empty-text">Add your first vehicle to get started</div>
+                        </div>
+                    `;
+                    this.showScreen('vehicleScreen');
+                } else if (this.vehicles.length === 1) {
+                    this.selectVehicle(this.vehicles[0]);
+                } else {
+                    vehicleList.innerHTML = this.vehicles.map(vehicle => `
+                        <div class="vehicle-card ${this.currentVehicle?.id === vehicle.id ? 'selected' : ''}" onclick="app.selectVehicle(${JSON.stringify(vehicle).replace(/"/g, '&quot;')})">
+                            <div class="vehicle-name">${vehicle.name}</div>
+                            <div class="vehicle-details">
+                                ${vehicle.regNo ? vehicle.regNo + ' • ' : ''}${vehicle.fuelType}
+                            </div>
+                        </div>
+                    `).join('');
+                    this.showScreen('vehicleScreen');
+                }
+            },
+
+            selectVehicle(vehicle) {
+                this.currentVehicle = vehicle;
+                localStorage.setItem('currentVehicle', JSON.stringify(vehicle));
+                document.getElementById('currentVehicleName').textContent = vehicle.name;
+                document.getElementById('vehicleSelector').classList.remove('hidden');
+                document.getElementById('bottomNav').style.display = 'flex';
+                this.showScreen('dashboardScreen');
+                this.updateDashboard();
+            },
+
+            showScreen(screenId) {
+                document.querySelectorAll('.screen').forEach(screen => {
+                    screen.classList.remove('active');
+                });
+                document.getElementById(screenId).classList.add('active');
+
+                document.querySelectorAll('.nav-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                const navItem = document.querySelector(`[data-screen="${screenId}"]`);
+                if (navItem) navItem.classList.add('active');
+
+                if (screenId === 'dashboardScreen') this.updateDashboard();
+                if (screenId === 'timelineScreen') this.updateTimeline();
+                if (screenId === 'reportsScreen') this.updateReports();
+                if (screenId === 'driversScreen') this.updateDrivers();
+                if (screenId === 'settingsScreen') this.updateSettings();
+            },
+
+            showAddVehicle() {
+                document.getElementById('vehicleForm').reset();
+                document.getElementById('addVehicleModal').classList.add('active');
+            },
+
+            saveVehicle(event) {
+                event.preventDefault();
+                
+                const vehicle = {
+                    id: Date.now().toString(),
+                    name: document.getElementById('vehicleName').value,
+                    regNo: document.getElementById('vehicleRegNo').value,
+                    fuelType: document.getElementById('vehicleFuelType').value,
+                    initialOdometer: parseFloat(document.getElementById('vehicleOdometer').value),
+                    currentOdometer: parseFloat(document.getElementById('vehicleOdometer').value),
+                    createdAt: new Date().toISOString()
+                };
+
+                this.vehicles.push(vehicle);
+                this.saveData();
+                this.closeModal('addVehicleModal');
+                this.selectVehicle(vehicle);
+            },
+
+            // Driver Management
+            showDrivers() {
+                this.showScreen('driversScreen');
+            },
+
+            showAddDriver() {
+                document.getElementById('driverForm').reset();
+                document.getElementById('addDriverModal').classList.add('active');
+            },
+
+            saveDriver(event) {
+                event.preventDefault();
+                
+                const driver = {
+                    id: Date.now().toString(),
+                    name: document.getElementById('driverName').value,
+                    phone: document.getElementById('driverPhone').value,
+                    createdAt: new Date().toISOString()
+                };
+
+                this.drivers.push(driver);
+                this.saveData();
+                this.closeModal('addDriverModal');
+                this.updateDrivers();
+                this.populateDriverSelects();
+            },
+
+            deleteDriver(driverId) {
+                if (confirm('Are you sure you want to delete this driver?')) {
+                    this.drivers = this.drivers.filter(d => d.id !== driverId);
+                    this.saveData();
+                    this.updateDrivers();
+                    this.populateDriverSelects();
+                }
+            },
+
+            updateDrivers() {
+                const driverList = document.getElementById('driverList');
+                
+                if (this.drivers.length === 0) {
+                    driverList.innerHTML = `
+                        <div class="empty-state" style="padding: 2rem 1rem;">
+                            <div class="empty-icon">👤</div>
+                            <div class="empty-title">No drivers yet</div>
+                            <div class="empty-text">Add drivers to track who drives your vehicle</div>
+                        </div>
+                    `;
+                } else {
+                    driverList.innerHTML = this.drivers.map(driver => `
+                        <div class="driver-item">
+                            <div class="driver-info">
+                                <div class="driver-avatar">${driver.name.charAt(0).toUpperCase()}</div>
+                                <div>
+                                    <div style="font-weight: 600;">${driver.name}</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                                        ${driver.phone || 'No phone number'}
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn btn-danger" style="padding: 0.5rem 0.75rem;" onclick="app.deleteDriver('${driver.id}')">Delete</button>
+                        </div>
+                    `).join('');
+                }
+            },
+
+            populateDriverSelects() {
+                const selects = ['fuelDriver', 'serviceDriver'];
+                selects.forEach(selectId => {
+                    const select = document.getElementById(selectId);
+                    if (select) {
+                        const currentValue = select.value;
+                        select.innerHTML = '<option value="">Select driver</option>' + 
+                            this.drivers.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+                        if (currentValue) select.value = currentValue;
+                    }
+                });
+            },
+
+            showAddMenu() {
+                if (!this.currentVehicle) {
+                    alert('Please select a vehicle first');
+                    return;
+                }
+                document.getElementById('addMenuModal').classList.add('active');
+            },
+
+            showAddFuel() {
+                this.closeModal('addMenuModal');
+                document.getElementById('fuelForm').reset();
+                this.currentPhotos.fuel = [];
+                document.getElementById('fuelPhotoPreview').innerHTML = '';
+                document.getElementById('fuelDate').value = new Date().toISOString().split('T')[0];
+                
+                if (this.currentVehicle) {
+                    document.getElementById('fuelOdometerHint').textContent = 
+                        `Last reading: ${this.currentVehicle.currentOdometer} KM`;
+                    document.getElementById('fuelType').value = this.currentVehicle.fuelType;
+                }
+                
+                this.populateDriverSelects();
+                document.getElementById('addFuelModal').classList.add('active');
+            },
+
+            calculateFuelCost() {
+                const quantity = parseFloat(document.getElementById('fuelQuantity').value) || 0;
+                const price = parseFloat(document.getElementById('fuelPrice').value) || 0;
+                const total = (quantity * price).toFixed(2);
+                document.getElementById('fuelTotalCost').value = total;
+            },
+
+            saveFuel(event) {
+                event.preventDefault();
+                
+                const odometer = parseFloat(document.getElementById('fuelOdometer').value);
+                if (odometer < this.currentVehicle.currentOdometer) {
+                    alert(`Odometer reading must be at least ${this.currentVehicle.currentOdometer} KM`);
+                    return;
+                }
+
+                const entry = {
+                    id: Date.now().toString(),
+                    vehicleId: this.currentVehicle.id,
+                    type: 'fuel',
+                    date: document.getElementById('fuelDate').value,
+                    odometer: odometer,
+                    driverId: document.getElementById('fuelDriver').value,
+                    fuelType: document.getElementById('fuelType').value,
+                    quantity: parseFloat(document.getElementById('fuelQuantity').value),
+                    pricePerUnit: parseFloat(document.getElementById('fuelPrice').value),
+                    totalCost: parseFloat(document.getElementById('fuelTotalCost').value),
+                    fullTank: document.getElementById('fuelFullTank').checked,
+                    station: document.getElementById('fuelStation').value,
+                    notes: document.getElementById('fuelNotes').value,
+                    photos: this.currentPhotos.fuel,
+                    createdAt: new Date().toISOString()
+                };
+
+                this.fuelEntries.push(entry);
+                this.currentVehicle.currentOdometer = odometer;
+                this.updateVehicleInList();
+                this.saveData();
+                this.closeModal('addFuelModal');
+                this.updateDashboard();
+                this.updateTimeline();
+            },
+
+            showAddService() {
+                this.closeModal('addMenuModal');
+                document.getElementById('serviceForm').reset();
+                this.currentPhotos.service = [];
+                document.getElementById('servicePhotoPreview').innerHTML = '';
+                document.getElementById('serviceDate').value = new Date().toISOString().split('T')[0];
+                
+                if (this.currentVehicle) {
+                    document.getElementById('serviceOdometerHint').textContent = 
+                        `Last reading: ${this.currentVehicle.currentOdometer} KM`;
+                }
+                
+                this.populateDriverSelects();
+                document.getElementById('addServiceModal').classList.add('active');
+            },
+
+            saveService(event) {
+                event.preventDefault();
+                
+                const odometer = parseFloat(document.getElementById('serviceOdometer').value);
+                if (odometer < this.currentVehicle.currentOdometer) {
+                    alert(`Odometer reading must be at least ${this.currentVehicle.currentOdometer} KM`);
+                    return;
+                }
+
+                const entry = {
+                    id: Date.now().toString(),
+                    vehicleId: this.currentVehicle.id,
+                    type: 'service',
+                    date: document.getElementById('serviceDate').value,
+                    odometer: odometer,
+                    driverId: document.getElementById('serviceDriver').value,
+                    serviceType: document.getElementById('serviceType').value,
+                    serviceCenter: document.getElementById('serviceCenter').value,
+                    cost: parseFloat(document.getElementById('serviceCost').value),
+                    notes: document.getElementById('serviceNotes').value,
+                    photos: this.currentPhotos.service,
+                    createdAt: new Date().toISOString()
+                };
+
+                this.serviceEntries.push(entry);
+                this.currentVehicle.currentOdometer = odometer;
+                this.updateVehicleInList();
+                this.saveData();
+                this.closeModal('addServiceModal');
+                this.updateDashboard();
+                this.updateTimeline();
+            },
+
+            showAddExpense() {
+                this.closeModal('addMenuModal');
+                document.getElementById('expenseForm').reset();
+                this.currentPhotos.expense = [];
+                document.getElementById('expensePhotoPreview').innerHTML = '';
+                document.getElementById('expenseDate').value = new Date().toISOString().split('T')[0];
+                document.getElementById('addExpenseModal').classList.add('active');
+            },
+
+            saveExpense(event) {
+                event.preventDefault();
+
+                const entry = {
+                    id: Date.now().toString(),
+                    vehicleId: this.currentVehicle.id,
+                    type: 'expense',
+                    date: document.getElementById('expenseDate').value,
+                    category: document.getElementById('expenseCategory').value,
+                    amount: parseFloat(document.getElementById('expenseAmount').value),
+                    notes: document.getElementById('expenseNotes').value,
+                    photos: this.currentPhotos.expense,
+                    createdAt: new Date().toISOString()
+                };
+
+                this.expenses.push(entry);
+                this.saveData();
+                this.closeModal('addExpenseModal');
+                this.updateDashboard();
+                this.updateTimeline();
+            },
+
+            showAddReminder() {
+                this.closeModal('addMenuModal');
+                document.getElementById('reminderForm').reset();
+                document.getElementById('addReminderModal').classList.add('active');
+            },
+
+            saveReminder(event) {
+                event.preventDefault();
+
+                const entry = {
+                    id: Date.now().toString(),
+                    vehicleId: this.currentVehicle.id,
+                    type: document.getElementById('reminderType').value,
+                    dueDate: document.getElementById('reminderDate').value,
+                    dueKM: document.getElementById('reminderKM').value,
+                    notes: document.getElementById('reminderNotes').value,
+                    status: 'pending',
+                    createdAt: new Date().toISOString()
+                };
+
+                this.reminders.push(entry);
+                this.saveData();
+                this.closeModal('addReminderModal');
+                this.updateDashboard();
+            },
+
+            // Dashboard
+            updateDashboard() {
+                if (!this.currentVehicle) return;
+
+                const vehicleFuel = this.fuelEntries.filter(e => e.vehicleId === this.currentVehicle.id);
+                const vehicleService = this.serviceEntries.filter(e => e.vehicleId === this.currentVehicle.id);
+                const vehicleExpenses = this.expenses.filter(e => e.vehicleId === this.currentVehicle.id);
+
+                const totalFuelCost = vehicleFuel.reduce((sum, e) => sum + e.totalCost, 0);
+                const totalServiceCost = vehicleService.reduce((sum, e) => sum + e.cost, 0);
+                const totalExpenseCost = vehicleExpenses.reduce((sum, e) => sum + e.amount, 0);
+                const totalCost = totalFuelCost + totalServiceCost + totalExpenseCost;
+
+                const now = new Date();
+                const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+                const thisMonthFuel = vehicleFuel.filter(e => new Date(e.date) >= thisMonthStart)
+                    .reduce((sum, e) => sum + e.totalCost, 0);
+                const thisMonthService = vehicleService.filter(e => new Date(e.date) >= thisMonthStart)
+                    .reduce((sum, e) => sum + e.cost, 0);
+                const thisMonthExpense = vehicleExpenses.filter(e => new Date(e.date) >= thisMonthStart)
+                    .reduce((sum, e) => sum + e.amount, 0);
+                const thisMonthTotal = thisMonthFuel + thisMonthService + thisMonthExpense;
+
+                let avgEfficiency = 0;
+                const fullTankEntries = vehicleFuel.filter(e => e.fullTank).sort((a, b) => a.odometer - b.odometer);
+                if (fullTankEntries.length >= 2) {
+                    let totalDistance = 0;
+                    let totalFuel = 0;
+                    for (let i = 1; i < fullTankEntries.length; i++) {
+                        const distance = fullTankEntries[i].odometer - fullTankEntries[i-1].odometer;
+                        totalDistance += distance;
+                        totalFuel += fullTankEntries[i].quantity;
+                    }
+                    avgEfficiency = totalFuel > 0 ? (totalDistance / totalFuel).toFixed(2) : 0;
+                }
+
+                document.getElementById('dashboardStats').innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-label">Current KM</div>
+                        <div class="stat-value">${this.currentVehicle.currentOdometer.toLocaleString('en-IN')}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total Expenses</div>
+                        <div class="stat-value">₹${totalCost.toLocaleString('en-IN', {maximumFractionDigits: 0})}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">This Month</div>
+                        <div class="stat-value">₹${thisMonthTotal.toLocaleString('en-IN', {maximumFractionDigits: 0})}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Avg. KMPL</div>
+                        <div class="stat-value">${avgEfficiency || '—'}</div>
+                    </div>
+                `;
+
+                const vehicleReminders = this.reminders.filter(r => 
+                    r.vehicleId === this.currentVehicle.id && r.status === 'pending'
+                );
+
+                const remindersHtml = vehicleReminders.length > 0 
+                    ? vehicleReminders.map(r => {
+                        const isUrgent = r.dueDate && new Date(r.dueDate) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+                        const whatsappEnabled = localStorage.getItem('whatsappEnabled') === 'true';
+                        
+                        return `
+                            <div class="reminder-card ${isUrgent ? 'urgent' : ''}">
+                                <div>
+                                    <div style="font-weight: 600; margin-bottom: 0.25rem;">${r.type}</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                                        ${r.dueDate ? 'Due: ' + new Date(r.dueDate).toLocaleDateString('en-IN') : ''}
+                                        ${r.dueKM ? 'Due at: ' + r.dueKM + ' KM' : ''}
+                                    </div>
+                                </div>
+                                ${whatsappEnabled ? `
+                                    <button class="reminder-whatsapp-btn" onclick="app.sendWhatsAppReminder(${JSON.stringify(r).replace(/"/g, '&quot;')})">
+                                        📱 Send
+                                    </button>
+                                ` : ''}
+                            </div>
+                        `;
+                    }).join('')
+                    : '<div class="empty-state" style="padding: 1rem;"><div class="empty-text">No upcoming reminders</div></div>';
+
+                document.getElementById('dashboardReminders').innerHTML = remindersHtml;
+            },
+
+            // Timeline
+            updateTimeline() {
+                if (!this.currentVehicle) return;
+
+                let allEntries = [
+                    ...this.fuelEntries.filter(e => e.vehicleId === this.currentVehicle.id).map(e => ({...e, type: 'fuel'})),
+                    ...this.serviceEntries.filter(e => e.vehicleId === this.currentVehicle.id).map(e => ({...e, type: 'service'})),
+                    ...this.expenses.filter(e => e.vehicleId === this.currentVehicle.id).map(e => ({...e, type: 'expense'}))
+                ];
+
+                if (this.currentFilter !== 'all') {
+                    allEntries = allEntries.filter(e => e.type === this.currentFilter);
+                }
+
+                allEntries.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                const grouped = {};
+                allEntries.forEach(entry => {
+                    const date = new Date(entry.date);
+                    const monthKey = date.toLocaleDateString('en-IN', { year: 'numeric', month: 'long' });
+                    if (!grouped[monthKey]) grouped[monthKey] = [];
+                    grouped[monthKey].push(entry);
+                });
+
+                let timelineHtml = '';
+                Object.entries(grouped).forEach(([month, entries]) => {
+                    timelineHtml += `
+                        <div class="timeline-group">
+                            <div class="timeline-group-header">${month}</div>
+                            ${entries.map(entry => this.renderTimelineEntry(entry)).join('')}
+                        </div>
+                    `;
+                });
+
+                if (timelineHtml === '') {
+                    timelineHtml = `
+                        <div class="empty-state">
+                            <div class="empty-icon">📅</div>
+                            <div class="empty-title">No entries yet</div>
+                            <div class="empty-text">Add your first entry to see it here</div>
+                        </div>
+                    `;
+                }
+
+                document.getElementById('timelineContent').innerHTML = timelineHtml;
+            },
+
+            renderTimelineEntry(entry) {
+                const icons = { fuel: '⛽', service: '🔧', expense: '💰' };
+                const titles = {
+                    fuel: `Fuel - ${entry.quantity}L ${entry.fuelType}`,
+                    service: `Service - ${entry.serviceType}`,
+                    expense: `${entry.category}`
+                };
+                const costs = {
+                    fuel: entry.totalCost,
+                    service: entry.cost,
+                    expense: entry.amount
+                };
+
+                const driverName = entry.driverId ? this.drivers.find(d => d.id === entry.driverId)?.name : null;
+                const hasPhotos = entry.photos && entry.photos.length > 0;
+
+                return `
+                    <div class="timeline-item" onclick="app.showEntryDetail(${JSON.stringify(entry).replace(/"/g, '&quot;')})">
+                        <div class="timeline-header">
+                            <div>
+                                <div class="timeline-title">${icons[entry.type]} ${titles[entry.type]} ${hasPhotos ? '📷' : ''}</div>
+                                <div class="timeline-meta">
+                                    ${new Date(entry.date).toLocaleDateString('en-IN')} 
+                                    ${entry.odometer ? '• ' + entry.odometer + ' KM' : ''}
+                                    ${driverName ? '• ' + driverName : ''}
+                                </div>
+                            </div>
+                            <div class="timeline-cost">₹${costs[entry.type].toLocaleString('en-IN', {maximumFractionDigits: 0})}</div>
+                        </div>
+                        ${entry.notes ? `<div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">${entry.notes}</div>` : ''}
+                    </div>
+                `;
+            },
+
+            showEntryDetail(entry) {
+                this.selectedEntry = entry;
+                let detailHtml = '';
+
+                const driverName = entry.driverId ? this.drivers.find(d => d.id === entry.driverId)?.name : 'N/A';
+
+                if (entry.type === 'fuel') {
+                    detailHtml = `
+                        <table class="report-table">
+                            <tr><td>Date</td><td>${new Date(entry.date).toLocaleDateString('en-IN')}</td></tr>
+                            <tr><td>Odometer</td><td>${entry.odometer} KM</td></tr>
+                            <tr><td>Driver</td><td>${driverName}</td></tr>
+                            <tr><td>Fuel Type</td><td>${entry.fuelType}</td></tr>
+                            <tr><td>Quantity</td><td>${entry.quantity} L</td></tr>
+                            <tr><td>Price/Unit</td><td>₹${entry.pricePerUnit}</td></tr>
+                            <tr><td>Total Cost</td><td>₹${entry.totalCost.toLocaleString('en-IN')}</td></tr>
+                            <tr><td>Full Tank</td><td>${entry.fullTank ? 'Yes' : 'No'}</td></tr>
+                            ${entry.station ? `<tr><td>Station</td><td>${entry.station}</td></tr>` : ''}
+                            ${entry.notes ? `<tr><td>Notes</td><td>${entry.notes}</td></tr>` : ''}
+                        </table>
+                    `;
+                } else if (entry.type === 'service') {
+                    detailHtml = `
+                        <table class="report-table">
+                            <tr><td>Date</td><td>${new Date(entry.date).toLocaleDateString('en-IN')}</td></tr>
+                            <tr><td>Odometer</td><td>${entry.odometer} KM</td></tr>
+                            <tr><td>Driver</td><td>${driverName}</td></tr>
+                            <tr><td>Service Type</td><td>${entry.serviceType}</td></tr>
+                            ${entry.serviceCenter ? `<tr><td>Service Center</td><td>${entry.serviceCenter}</td></tr>` : ''}
+                            <tr><td>Cost</td><td>₹${entry.cost.toLocaleString('en-IN')}</td></tr>
+                            ${entry.notes ? `<tr><td>Notes</td><td>${entry.notes}</td></tr>` : ''}
+                        </table>
+                    `;
+                } else if (entry.type === 'expense') {
+                    detailHtml = `
+                        <table class="report-table">
+                            <tr><td>Date</td><td>${new Date(entry.date).toLocaleDateString('en-IN')}</td></tr>
+                            <tr><td>Category</td><td>${entry.category}</td></tr>
+                            <tr><td>Amount</td><td>₹${entry.amount.toLocaleString('en-IN')}</td></tr>
+                            ${entry.notes ? `<tr><td>Notes</td><td>${entry.notes}</td></tr>` : ''}
+                        </table>
+                    `;
+                }
+
+                document.getElementById('detailTitle').textContent = 'Entry Details';
+                document.getElementById('detailContent').innerHTML = detailHtml;
+                
+                const photosContainer = document.getElementById('detailPhotos');
+                if (entry.photos && entry.photos.length > 0) {
+                    photosContainer.innerHTML = entry.photos.map(photo => `
+                        <div class="photo-preview" onclick="app.viewPhoto('${photo.data}')">
+                            <img src="${photo.data}" alt="Receipt">
+                        </div>
+                    `).join('');
+                } else {
+                    photosContainer.innerHTML = '';
+                }
+                
+                document.getElementById('entryDetailModal').classList.add('active');
+            },
+
+            deleteEntry() {
+                if (!this.selectedEntry) return;
+                
+                if (!confirm('Are you sure you want to delete this entry?')) return;
+
+                const entry = this.selectedEntry;
+                if (entry.type === 'fuel') {
+                    this.fuelEntries = this.fuelEntries.filter(e => e.id !== entry.id);
+                } else if (entry.type === 'service') {
+                    this.serviceEntries = this.serviceEntries.filter(e => e.id !== entry.id);
+                } else if (entry.type === 'expense') {
+                    this.expenses = this.expenses.filter(e => e.id !== entry.id);
+                }
+
+                this.saveData();
+                this.closeModal('entryDetailModal');
+                this.updateTimeline();
+                this.updateDashboard();
+                this.selectedEntry = null;
+            },
+
+            filterTimeline(filter) {
+                this.currentFilter = filter;
+                document.querySelectorAll('#timelineFilters .filter-chip').forEach(chip => {
+                    chip.classList.remove('active');
+                });
+                document.querySelector(`#timelineFilters [data-filter="${filter}"]`).classList.add('active');
+                this.updateTimeline();
+            },
+
+            // Reports with Trends and Comparisons
+            updateReports() {
+                if (!this.currentVehicle) return;
+
+                const vehicleFuel = this.fuelEntries.filter(e => e.vehicleId === this.currentVehicle.id);
+                const vehicleService = this.serviceEntries.filter(e => e.vehicleId === this.currentVehicle.id);
+                const vehicleExpenses = this.expenses.filter(e => e.vehicleId === this.currentVehicle.id);
+
+                const totalFuelCost = vehicleFuel.reduce((sum, e) => sum + e.totalCost, 0);
+                const totalServiceCost = vehicleService.reduce((sum, e) => sum + e.cost, 0);
+                const totalExpenseCost = vehicleExpenses.reduce((sum, e) => sum + e.amount, 0);
+                const totalCost = totalFuelCost + totalServiceCost + totalExpenseCost;
+
+                const totalDistance = this.currentVehicle.currentOdometer - this.currentVehicle.initialOdometer;
+                const costPerKM = totalDistance > 0 ? (totalCost / totalDistance).toFixed(2) : 0;
+
+                document.getElementById('reportStats').innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-label">Total Fuel</div>
+                        <div class="stat-value">₹${totalFuelCost.toLocaleString('en-IN', {maximumFractionDigits: 0})}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total Service</div>
+                        <div class="stat-value">₹${totalServiceCost.toLocaleString('en-IN', {maximumFractionDigits: 0})}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Other Expenses</div>
+                        <div class="stat-value">₹${totalExpenseCost.toLocaleString('en-IN', {maximumFractionDigits: 0})}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Cost/KM</div>
+                        <div class="stat-value">₹${costPerKM}</div>
+                    </div>
+                `;
+
+                const categoryBreakdown = {};
+                vehicleExpenses.forEach(e => {
+                    categoryBreakdown[e.category] = (categoryBreakdown[e.category] || 0) + e.amount;
+                });
+
+                let detailsHtml = `
+                    <div class="card">
+                        <h3 class="card-title">Total Summary</h3>
+                        <table class="report-table">
+                            <tr><td>Fuel Expenses</td><td>₹${totalFuelCost.toLocaleString('en-IN')}</td></tr>
+                            <tr><td>Service Expenses</td><td>₹${totalServiceCost.toLocaleString('en-IN')}</td></tr>
+                            <tr><td>Other Expenses</td><td>₹${totalExpenseCost.toLocaleString('en-IN')}</td></tr>
+                            <tr style="font-weight: 700;"><td>Grand Total</td><td>₹${totalCost.toLocaleString('en-IN')}</td></tr>
+                        </table>
+                    </div>
+                `;
+
+                if (Object.keys(categoryBreakdown).length > 0) {
+                    detailsHtml += `
+                        <div class="card">
+                            <h3 class="card-title">Expense by Category</h3>
+                            <table class="report-table">
+                                ${Object.entries(categoryBreakdown)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .map(([cat, amt]) => `<tr><td>${cat}</td><td>₹${amt.toLocaleString('en-IN')}</td></tr>`)
+                                    .join('')}
+                            </table>
+                        </div>
+                    `;
+                }
+
+                document.getElementById('reportDetails').innerHTML = detailsHtml;
+
+                // Fuel Price Trends
+                this.updateFuelTrends(vehicleFuel);
+
+                // Service Cost Comparison
+                this.updateServiceComparison(vehicleService);
+            },
+
+            updateFuelTrends(vehicleFuel) {
+                const last10 = vehicleFuel
+                    .sort((a, b) => new Date(a.date) - new Date(b.date))
+                    .slice(-10);
+
+                if (last10.length < 2) {
+                    document.getElementById('fuelTrendChart').innerHTML = `
+                        <div class="empty-state" style="padding: 2rem 1rem;">
+                            <div class="empty-text">Add more fuel entries to see trends</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const maxPrice = Math.max(...last10.map(e => e.pricePerUnit));
+                
+                const chartHtml = last10.map((entry, idx) => {
+                    const percentage = (entry.pricePerUnit / maxPrice) * 100;
+                    const date = new Date(entry.date).toLocaleDateString('en-IN', {month: 'short', day: 'numeric'});
+                    
+                    return `
+                        <div class="chart-bar">
+                            <div class="chart-label">${date}</div>
+                            <div class="chart-bar-track">
+                                <div class="chart-bar-fill" style="width: ${percentage}%">
+                                    ₹${entry.pricePerUnit}
+                                </div>
+                            </div>
+                            <div class="chart-value">${entry.fuelType}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                document.getElementById('fuelTrendChart').innerHTML = chartHtml;
+            },
+
+            updateServiceComparison(vehicleService) {
+                const serviceByType = {};
+                vehicleService.forEach(e => {
+                    if (!serviceByType[e.serviceType]) {
+                        serviceByType[e.serviceType] = { total: 0, count: 0 };
+                    }
+                    serviceByType[e.serviceType].total += e.cost;
+                    serviceByType[e.serviceType].count += 1;
+                });
+
+                if (Object.keys(serviceByType).length === 0) {
+                    document.getElementById('serviceComparisonChart').innerHTML = `
+                        <div class="empty-state" style="padding: 2rem 1rem;">
+                            <div class="empty-text">Add service records to see cost comparison</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const maxCost = Math.max(...Object.values(serviceByType).map(s => s.total));
+                
+                const chartHtml = Object.entries(serviceByType)
+                    .sort((a, b) => b[1].total - a[1].total)
+                    .map(([type, data]) => {
+                        const percentage = (data.total / maxCost) * 100;
+                        const avgCost = data.total / data.count;
+                        
+                        return `
+                            <div class="chart-bar">
+                                <div class="chart-label">${type}</div>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill" style="width: ${percentage}%"></div>
+                                </div>
+                                <div class="chart-value">₹${data.total.toLocaleString('en-IN', {maximumFractionDigits: 0})}</div>
+                            </div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.75rem; text-align: right;">
+                                ${data.count} time${data.count > 1 ? 's' : ''} • Avg: ₹${avgCost.toLocaleString('en-IN', {maximumFractionDigits: 0})}
+                            </div>
+                        `;
+                    }).join('');
+
+                document.getElementById('serviceComparisonChart').innerHTML = chartHtml;
+            },
+
+            showReportTab(tab) {
+                document.querySelectorAll('#reportsScreen .filter-chip').forEach(chip => {
+                    chip.classList.remove('active');
+                });
+                document.querySelector(`#reportsScreen [data-tab="${tab}"]`).classList.add('active');
+
+                document.getElementById('reportSummary').classList.add('hidden');
+                document.getElementById('reportTrends').classList.add('hidden');
+                document.getElementById('reportComparison').classList.add('hidden');
+
+                if (tab === 'summary') {
+                    document.getElementById('reportSummary').classList.remove('hidden');
+                } else if (tab === 'trends') {
+                    document.getElementById('reportTrends').classList.remove('hidden');
+                } else if (tab === 'comparison') {
+                    document.getElementById('reportComparison').classList.remove('hidden');
+                }
+            },
+
+            updateSettings() {
+                document.getElementById('userEmail').textContent = this.currentUser?.email || '';
+            },
+
+            exportData() {
+                if (!this.currentVehicle) {
+                    alert('Please select a vehicle first');
+                    return;
+                }
+
+                let csv = 'Type,Date,Odometer,Category/Type,Driver,Amount,Notes,Photos\n';
+                
+                const vehicleFuel = this.fuelEntries.filter(e => e.vehicleId === this.currentVehicle.id);
+                const vehicleService = this.serviceEntries.filter(e => e.vehicleId === this.currentVehicle.id);
+                const vehicleExpenses = this.expenses.filter(e => e.vehicleId === this.currentVehicle.id);
+
+                vehicleFuel.forEach(e => {
+                    const driverName = e.driverId ? this.drivers.find(d => d.id === e.driverId)?.name : '';
+                    const hasPhotos = e.photos && e.photos.length > 0 ? 'Yes' : 'No';
+                    csv += `Fuel,${e.date},${e.odometer},${e.fuelType},${driverName},${e.totalCost},"${e.notes || ''}",${hasPhotos}\n`;
+                });
+
+                vehicleService.forEach(e => {
+                    const driverName = e.driverId ? this.drivers.find(d => d.id === e.driverId)?.name : '';
+                    const hasPhotos = e.photos && e.photos.length > 0 ? 'Yes' : 'No';
+                    csv += `Service,${e.date},${e.odometer},${e.serviceType},${driverName},${e.cost},"${e.notes || ''}",${hasPhotos}\n`;
+                });
+
+                vehicleExpenses.forEach(e => {
+                    const hasPhotos = e.photos && e.photos.length > 0 ? 'Yes' : 'No';
+                    csv += `Expense,${e.date},,${e.category},,${e.amount},"${e.notes || ''}",${hasPhotos}\n`;
+                });
+
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `car-expense-${this.currentVehicle.name}-${new Date().toISOString().split('T')[0]}.csv`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            },
+
+            closeModal(modalId) {
+                document.getElementById(modalId).classList.remove('active');
+            },
+
+            loadData() {
+                this.vehicles = JSON.parse(localStorage.getItem('vehicles') || '[]');
+                this.fuelEntries = JSON.parse(localStorage.getItem('fuelEntries') || '[]');
+                this.serviceEntries = JSON.parse(localStorage.getItem('serviceEntries') || '[]');
+                this.expenses = JSON.parse(localStorage.getItem('expenses') || '[]');
+                this.reminders = JSON.parse(localStorage.getItem('reminders') || '[]');
+                this.drivers = JSON.parse(localStorage.getItem('drivers') || '[]');
+                
+                const savedVehicle = localStorage.getItem('currentVehicle');
+                if (savedVehicle) {
+                    this.currentVehicle = JSON.parse(savedVehicle);
+                }
+            },
+
+            saveData() {
+                localStorage.setItem('vehicles', JSON.stringify(this.vehicles));
+                localStorage.setItem('fuelEntries', JSON.stringify(this.fuelEntries));
+                localStorage.setItem('serviceEntries', JSON.stringify(this.serviceEntries));
+                localStorage.setItem('expenses', JSON.stringify(this.expenses));
+                localStorage.setItem('reminders', JSON.stringify(this.reminders));
+                localStorage.setItem('drivers', JSON.stringify(this.drivers));
+                this.syncPending = true;
+                this.updateSyncStatus();
+            },
+
+            updateVehicleInList() {
+                const index = this.vehicles.findIndex(v => v.id === this.currentVehicle.id);
+                if (index !== -1) {
+                    this.vehicles[index] = this.currentVehicle;
+                    localStorage.setItem('vehicles', JSON.stringify(this.vehicles));
+                    localStorage.setItem('currentVehicle', JSON.stringify(this.currentVehicle));
+                }
+            },
+
+            updateSyncStatus() {
+                const indicator = document.getElementById('syncIndicator');
+                
+                if (!this.isOnline) {
+                    indicator.className = 'sync-indicator offline';
+                } else if (this.syncPending) {
+                    indicator.className = 'sync-indicator syncing';
+                } else {
+                    indicator.className = 'sync-indicator';
+                }
+            },
+
+            async createOrOpenSpreadsheet() {
+    const spreadsheetId = localStorage.getItem('spreadsheetId');
+    
+    if (!spreadsheetId) {
+        try {
+            console.log('Creating new spreadsheet...');
+            const response = await gapi.client.sheets.spreadsheets.create({
+                properties: {
+                    title: `Car Expense Tracker - ${this.currentUser.email}`
+                },
+                sheets: [
+                    { properties: { title: 'Vehicles' } },
+                    { properties: { title: 'Fuel Entries' } },
+                    { properties: { title: 'Service Records' } },
+                    { properties: { title: 'Expenses' } },
+                    { properties: { title: 'Reminders' } },
+                    { properties: { title: 'Drivers' } }
+                ]
+            });
+            
+            const newSpreadsheetId = response.result.spreadsheetId;
+            localStorage.setItem('spreadsheetId', newSpreadsheetId);
+            console.log('Spreadsheet created:', newSpreadsheetId);
+            
+            // Add headers to each sheet
+            await this.addHeaders(newSpreadsheetId);
+        } catch (error) {
+            console.error('Error creating spreadsheet:', error);
+            alert('Failed to create spreadsheet. Check console for details.');
+        }
+    } else {
+        console.log('Using existing spreadsheet:', spreadsheetId);
+    }
+},
+
+            async addHeaders(spreadsheetId) {
+    const headers = {
+        'Vehicles': ['ID', 'Name', 'Registration', 'Fuel Type', 'Initial Odometer', 'Current Odometer', 'Created At'],
+        'Fuel Entries': ['ID', 'Vehicle ID', 'Date', 'Odometer', 'Driver ID', 'Fuel Type', 'Quantity', 'Price/Unit', 'Total Cost', 'Full Tank', 'Station', 'Notes', 'Has Photos', 'Created At'],
+        'Service Records': ['ID', 'Vehicle ID', 'Date', 'Odometer', 'Driver ID', 'Service Type', 'Service Center', 'Cost', 'Notes', 'Has Photos', 'Created At'],
+        'Expenses': ['ID', 'Vehicle ID', 'Date', 'Category', 'Amount', 'Notes', 'Has Photos', 'Created At'],
+        'Reminders': ['ID', 'Vehicle ID', 'Type', 'Due Date', 'Due KM', 'Status', 'Notes', 'Created At'],
+        'Drivers': ['ID', 'Name', 'Phone', 'Created At']
+    };
+
+    const requests = Object.entries(headers).map(([sheetName, headerRow]) => ({
+        updateCells: {
+            range: {
+                sheetId: this.getSheetId(sheetName),
+                startRowIndex: 0,
+                endRowIndex: 1,
+                startColumnIndex: 0,
+                endColumnIndex: headerRow.length
+            },
+            rows: [{
+                values: headerRow.map(header => ({
+                    userEnteredValue: { stringValue: header },
+                    userEnteredFormat: {
+                        textFormat: { bold: true },
+                        backgroundColor: { red: 0.9, green: 0.9, blue: 0.9 }
+                    }
+                }))
+            }],
+            fields: 'userEnteredValue,userEnteredFormat(textFormat,backgroundColor)'
+        }
+    }));
+
+    try {
+        await gapi.client.sheets.spreadsheets.batchUpdate({
+            spreadsheetId: spreadsheetId,
+            resource: { requests }
+        });
+    } catch (error) {
+        console.error('Error adding headers:', error);
+    }
+},
+
+            getSheetId(sheetName) {
+    const sheetIds = {
+        'Vehicles': 0,
+        'Fuel Entries': 1,
+        'Service Records': 2,
+        'Expenses': 3,
+        'Reminders': 4,
+        'Drivers': 5
+    };
+    return sheetIds[sheetName];
+},
+            setupAutoSync() {
+                setInterval(() => {
+                    if (this.isOnline && this.syncPending) {
+                        this.syncData();
+                    }
+                }, 30000);
+            },
+
+            manualSync() {
+                if (!this.isOnline) {
+                    alert('You are offline. Please connect to the internet to sync.');
+                    return;
+                }
+                this.syncData();
+            },
+
+            async syncData() {
+                const spreadsheetId = localStorage.getItem('spreadsheetId');
+                if (!spreadsheetId) {
+                    console.log('No spreadsheet ID found');
+                    return;
+                }
+
+                try {
+                    console.log('Syncing data to Google Sheets...');
+                    
+                    // Sync each data type
+                    await this.syncSheet(spreadsheetId, 'Vehicles', this.vehicles);
+                    await this.syncSheet(spreadsheetId, 'Fuel Entries', this.fuelEntries);
+                    await this.syncSheet(spreadsheetId, 'Service Records', this.serviceEntries);
+                    await this.syncSheet(spreadsheetId, 'Expenses', this.expenses);
+                    await this.syncSheet(spreadsheetId, 'Reminders', this.reminders);
+                    await this.syncSheet(spreadsheetId, 'Drivers', this.drivers);
+                    
+                    this.syncPending = false;
+                    this.updateSyncStatus();
+                    console.log('Sync completed successfully');
+                } catch (error) {
+                    console.error('Sync error:', error);
+                    this.syncPending = true;
+                }
+            },
+
+            async syncSheet(spreadsheetId, sheetName, data) {
+                if (!data || data.length === 0) {
+                    console.log(`No data to sync for ${sheetName}`);
+                    return;
+                }
+
+                const values = data.map(item => {
+                    const row = Object.values(item).map(value => {
+                        if (typeof value === 'object' && value !== null) {
+                            return JSON.stringify(value);
+                        }
+                        return value != null ? String(value) : '';
+                    });
+                    return row;
+                });
+
+                try {
+                    await gapi.client.sheets.spreadsheets.values.update({
+                        spreadsheetId: spreadsheetId,
+                        range: `${sheetName}!A2`,
+                        valueInputOption: 'RAW',
+                        resource: { values }
+                    });
+                    console.log(`${sheetName} synced successfully`);
+                } catch (error) {
+                    console.error(`Error syncing ${sheetName}:`, error);
+                    throw error;
+                }
+            },            
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            app.init();
+        });
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        }
+
+        // Global callback for Google Sign-In
+        function handleCredentialResponse(response) {
+            console.log('✅ Sign-in successful!');
+            
+            try {
+                // Decode the JWT token
+                const base64Url = response.credential.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                const userInfo = JSON.parse(jsonPayload);
+                
+                app.currentUser = {
+                    email: userInfo.email,
+                    name: userInfo.name,
+                    id: userInfo.sub,
+                    credential: response.credential
+                };
+                
+                localStorage.setItem('carExpenseUser', JSON.stringify(app.currentUser));
+                console.log('👤 Logged in as:', userInfo.email);
+                
+                // Initialize Google Sheets API with OAuth token
+                app.initializeGoogleSheets(response.credential);
+                
+            } catch (error) {
+                console.error('❌ Error processing sign-in:', error);
+                alert('Sign-in failed. Please try again.');
+            }
+        }
+
+    </script>
+</body>
+</html>
