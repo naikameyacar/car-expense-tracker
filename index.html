@@ -9,7 +9,6 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚗</text></svg>"> 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="https://apis.google.com/js/api.js"></script>
 
     <style>
         * {
@@ -1813,38 +1812,34 @@
             },
 
             handleGoogleLogin() {
-                console.log('🔄 Starting Google Sign-In...');
-                
-                if (typeof google === 'undefined') {
-                    alert('⚠️ Google Sign-In library not loaded yet. Please wait a moment and try again.');
-                    console.error('Google library not loaded');
-                    return;
-                }
+                // Initialize Google Identity Services
+                google.accounts.id.initialize({
+                    client_id: '493056886974-suc8d0ljpjtarb4cs8td664dm0da7ibn.apps.googleusercontent.com', // REPLACE WITH YOUR ACTUAL CLIENT ID
+                    callback: (response) => {
+                        // Decode the JWT token
+                        const userInfo = this.parseJwt(response.credential);
+                        
+                        this.currentUser = {
+                            email: userInfo.email,
+                            name: userInfo.name,
+                            id: userInfo.sub,
+                            accessToken: response.credential
+                        };
+                        
+                        localStorage.setItem('carExpenseUser', JSON.stringify(this.currentUser));
+                        
+                        // Initialize Google APIs for Sheets access
+                        this.initGoogleAPIs(response.credential);
+                    }
+                });
 
-                try {
-                    // Initialize Google Identity Services
-                    google.accounts.id.initialize({
-                        client_id: '493056886974-suc8d0ljpjtarb4cs8td664dm0da7ibn.apps.googleusercontent.com',
-                        callback: handleCredentialResponse,
-                        auto_select: false,
-                        cancel_on_tap_outside: false
-                    });
-
-                    // Show the One Tap dialog
-                    google.accounts.id.prompt((notification) => {
-                        if (notification.isNotDisplayed()) {
-                            console.log('⚠️ One Tap not displayed:', notification.getNotDisplayedReason());
-                        }
-                        if (notification.isSkippedMoment()) {
-                            console.log('⚠️ One Tap skipped:', notification.getSkippedReason());
-                        }
-                    });
-                    
-                    console.log('✅ Google Sign-In initialized');
-                } catch (error) {
-                    console.error('❌ Error initializing Google Sign-In:', error);
-                    alert('Error: ' + error.message);
-                }
+                // Show the One Tap dialog
+                google.accounts.id.prompt((notification) => {
+                    if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                        // Fallback to button-triggered sign-in
+                        console.log('One Tap not displayed, using button sign-in');
+                    }
+                });
             },
 
             parseJwt(token) {
@@ -1856,61 +1851,25 @@
                 return JSON.parse(jsonPayload);
             },
 
-            // Initialize Google Sheets API with OAuth token from Google Identity
-            async initializeGoogleSheets(credential) {
-                console.log('🔄 Initializing Google Sheets API...');
+            async initGoogleAPIs(credential) {
+                // Load the Google API client
+                await new Promise((resolve) => {
+                    gapi.load('client', resolve);
+                });
+
+                // Initialize the client
+                await gapi.client.init({
+                    discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4']
+                });
+
+                // Set the access token
+                gapi.client.setToken({ access_token: credential });
+
+                // Create or open spreadsheet
+                await this.createOrOpenSpreadsheet();
                 
-                // IMMEDIATELY show vehicle screen while sheets loads
-                document.getElementById('loginScreen').classList.remove('active');
-                document.getElementById('bottomNav').style.display = 'flex';
-                
-                try {
-                    // Request access token using the ID token
-                    const tokenClient = google.accounts.oauth2.initTokenClient({
-                        client_id: '493056886974-suc8d0ljpjtarb4cs8td664dm0da7ibn.apps.googleusercontent.com',
-                        scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file',
-                        callback: async (response) => {
-                            if (response.error) {
-                                console.error('❌ Token error:', response.error);
-                                console.log('⚠️ App will work offline only');
-                                this.showVehicleSelection();
-                                return;
-                            }
-                            
-                            console.log('✅ Access token received');
-                            this.accessToken = response.access_token;
-                            
-                            // Load Google API client
-                            await new Promise((resolve) => {
-                                gapi.load('client', resolve);
-                            });
-                            
-                            // Initialize the client
-                            await gapi.client.init({
-                                discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4'],
-                            });
-                            
-                            // Set the access token
-                            gapi.client.setToken({ access_token: response.access_token });
-                            
-                            console.log('✅ Google Sheets API initialized');
-                            
-                            // Create or open spreadsheet (this will load data if exists)
-                            await this.createOrOpenSpreadsheet();
-                            
-                            // Refresh vehicle selection with loaded data
-                            this.showVehicleSelection();
-                        },
-                    });
-                    
-                    // Request access token (this shows the permissions popup)
-                    tokenClient.requestAccessToken({ prompt: '' });
-                    
-                } catch (error) {
-                    console.error('❌ Error initializing Google Sheets:', error);
-                    console.log('⚠️ App will work offline');
-                    this.showVehicleSelection();
-                }
+                // Show vehicle selection
+                this.showVehicleSelection();
             },
 
             processUser(user) {
@@ -2793,203 +2752,94 @@
                     indicator.className = 'sync-indicator';
                 }
             },
+async createOrOpenSpreadsheet() {
+    const spreadsheetId = localStorage.getItem('spreadsheetId');
+    
+    if (!spreadsheetId) {
+        try {
+            console.log('Creating new spreadsheet...');
+            const response = await gapi.client.sheets.spreadsheets.create({
+                properties: {
+                    title: `Car Expense Tracker - ${this.currentUser.email}`
+                },
+                sheets: [
+                    { properties: { title: 'Vehicles' } },
+                    { properties: { title: 'Fuel Entries' } },
+                    { properties: { title: 'Service Records' } },
+                    { properties: { title: 'Expenses' } },
+                    { properties: { title: 'Reminders' } },
+                    { properties: { title: 'Drivers' } }
+                ]
+            });
+            
+            const newSpreadsheetId = response.result.spreadsheetId;
+            localStorage.setItem('spreadsheetId', newSpreadsheetId);
+            console.log('Spreadsheet created:', newSpreadsheetId);
+            
+            // Add headers to each sheet
+            await this.addHeaders(newSpreadsheetId);
+        } catch (error) {
+            console.error('Error creating spreadsheet:', error);
+            alert('Failed to create spreadsheet. Check console for details.');
+        }
+    } else {
+        console.log('Using existing spreadsheet:', spreadsheetId);
+    }
+},
 
-            async createOrOpenSpreadsheet() {
-                const spreadsheetId = localStorage.getItem('spreadsheetId');
-                
-                if (!spreadsheetId) {
-                    try {
-                        console.log('📝 Creating new spreadsheet...');
-                        const response = await gapi.client.sheets.spreadsheets.create({
-                            properties: {
-                                title: `Car Expense Tracker - ${this.currentUser.email}`
-                            },
-                            sheets: [
-                                { properties: { title: 'Vehicles' } },
-                                { properties: { title: 'Fuel Entries' } },
-                                { properties: { title: 'Service Records' } },
-                                { properties: { title: 'Expenses' } },
-                                { properties: { title: 'Reminders' } },
-                                { properties: { title: 'Drivers' } }
-                            ]
-                        });
-                        
-                        const newSpreadsheetId = response.result.spreadsheetId;
-                        localStorage.setItem('spreadsheetId', newSpreadsheetId);
-                        console.log('✅ Spreadsheet created:', newSpreadsheetId);
-                        console.log('📊 View it at: https://docs.google.com/spreadsheets/d/' + newSpreadsheetId);
-                        
-                        // Add headers to each sheet
-                        await this.addHeaders(newSpreadsheetId);
-                    } catch (error) {
-                        console.error('❌ Error creating spreadsheet:', error);
-                        alert('Failed to create spreadsheet. App will work offline.');
-                    }
-                } else {
-                    console.log('📊 Using existing spreadsheet:', spreadsheetId);
-                    // Load data from sheets
-                    await this.loadDataFromSheets(spreadsheetId);
-                }
+async addHeaders(spreadsheetId) {
+    const headers = {
+        'Vehicles': ['ID', 'Name', 'Registration', 'Fuel Type', 'Initial Odometer', 'Current Odometer', 'Created At'],
+        'Fuel Entries': ['ID', 'Vehicle ID', 'Date', 'Odometer', 'Driver ID', 'Fuel Type', 'Quantity', 'Price/Unit', 'Total Cost', 'Full Tank', 'Station', 'Notes', 'Has Photos', 'Created At'],
+        'Service Records': ['ID', 'Vehicle ID', 'Date', 'Odometer', 'Driver ID', 'Service Type', 'Service Center', 'Cost', 'Notes', 'Has Photos', 'Created At'],
+        'Expenses': ['ID', 'Vehicle ID', 'Date', 'Category', 'Amount', 'Notes', 'Has Photos', 'Created At'],
+        'Reminders': ['ID', 'Vehicle ID', 'Type', 'Due Date', 'Due KM', 'Status', 'Notes', 'Created At'],
+        'Drivers': ['ID', 'Name', 'Phone', 'Created At']
+    };
+
+    const requests = Object.entries(headers).map(([sheetName, headerRow]) => ({
+        updateCells: {
+            range: {
+                sheetId: this.getSheetId(sheetName),
+                startRowIndex: 0,
+                endRowIndex: 1,
+                startColumnIndex: 0,
+                endColumnIndex: headerRow.length
             },
+            rows: [{
+                values: headerRow.map(header => ({
+                    userEnteredValue: { stringValue: header },
+                    userEnteredFormat: {
+                        textFormat: { bold: true },
+                        backgroundColor: { red: 0.9, green: 0.9, blue: 0.9 }
+                    }
+                }))
+            }],
+            fields: 'userEnteredValue,userEnteredFormat(textFormat,backgroundColor)'
+        }
+    }));
 
-            async loadDataFromSheets(spreadsheetId) {
-                console.log('📥 Loading data from Google Sheets...');
-                
-                try {
-                    // Load all sheets data
-                    const sheetNames = ['Vehicles', 'Fuel Entries', 'Service Records', 'Expenses', 'Reminders', 'Drivers'];
-                    const ranges = sheetNames.map(name => `${name}!A2:Z1000`);
-                    
-                    const response = await gapi.client.sheets.spreadsheets.values.batchGet({
-                        spreadsheetId: spreadsheetId,
-                        ranges: ranges
-                    });
-                    
-                    const valueRanges = response.result.valueRanges;
-                    
-                    // Parse Vehicles
-                    if (valueRanges[0] && valueRanges[0].values) {
-                        this.vehicles = this.parseSheetData(valueRanges[0].values, 
-                            ['id', 'name', 'regNo', 'fuelType', 'initialOdometer', 'currentOdometer', 'createdAt']);
-                    }
-                    
-                    // Parse Fuel Entries
-                    if (valueRanges[1] && valueRanges[1].values) {
-                        this.fuelEntries = this.parseSheetData(valueRanges[1].values,
-                            ['id', 'vehicleId', 'date', 'odometer', 'driverId', 'fuelType', 'quantity', 'pricePerUnit', 'totalCost', 'fullTank', 'station', 'notes', 'photos', 'createdAt']);
-                    }
-                    
-                    // Parse Service Records
-                    if (valueRanges[2] && valueRanges[2].values) {
-                        this.serviceEntries = this.parseSheetData(valueRanges[2].values,
-                            ['id', 'vehicleId', 'date', 'odometer', 'driverId', 'serviceType', 'serviceCenter', 'cost', 'notes', 'photos', 'createdAt']);
-                    }
-                    
-                    // Parse Expenses
-                    if (valueRanges[3] && valueRanges[3].values) {
-                        this.expenses = this.parseSheetData(valueRanges[3].values,
-                            ['id', 'vehicleId', 'date', 'category', 'amount', 'notes', 'photos', 'createdAt']);
-                    }
-                    
-                    // Parse Reminders
-                    if (valueRanges[4] && valueRanges[4].values) {
-                        this.reminders = this.parseSheetData(valueRanges[4].values,
-                            ['id', 'vehicleId', 'type', 'dueDate', 'dueKM', 'status', 'notes', 'createdAt']);
-                    }
-                    
-                    // Parse Drivers
-                    if (valueRanges[5] && valueRanges[5].values) {
-                        this.drivers = this.parseSheetData(valueRanges[5].values,
-                            ['id', 'name', 'phone', 'createdAt']);
-                    }
-                    
-                    // Save to localStorage
-                    localStorage.setItem('vehicles', JSON.stringify(this.vehicles));
-                    localStorage.setItem('fuelEntries', JSON.stringify(this.fuelEntries));
-                    localStorage.setItem('serviceEntries', JSON.stringify(this.serviceEntries));
-                    localStorage.setItem('expenses', JSON.stringify(this.expenses));
-                    localStorage.setItem('reminders', JSON.stringify(this.reminders));
-                    localStorage.setItem('drivers', JSON.stringify(this.drivers));
-                    
-                    console.log('✅ Data loaded from sheets:');
-                    console.log(`  - ${this.vehicles.length} vehicles`);
-                    console.log(`  - ${this.fuelEntries.length} fuel entries`);
-                    console.log(`  - ${this.serviceEntries.length} service records`);
-                    console.log(`  - ${this.expenses.length} expenses`);
-                    console.log(`  - ${this.reminders.length} reminders`);
-                    console.log(`  - ${this.drivers.length} drivers`);
-                    
-                } catch (error) {
-                    console.error('❌ Error loading data from sheets:', error);
-                    console.log('Using local data instead');
-                }
-            },
+    try {
+        await gapi.client.sheets.spreadsheets.batchUpdate({
+            spreadsheetId: spreadsheetId,
+            resource: { requests }
+        });
+    } catch (error) {
+        console.error('Error adding headers:', error);
+    }
+},
 
-            parseSheetData(rows, keys) {
-                return rows.map(row => {
-                    const obj = {};
-                    keys.forEach((key, index) => {
-                        let value = row[index] || '';
-                        
-                        // Parse JSON strings back to objects
-                        if (value && typeof value === 'string' && (value.startsWith('{') || value.startsWith('['))) {
-                            try {
-                                value = JSON.parse(value);
-                            } catch (e) {
-                                // Keep as string if not valid JSON
-                            }
-                        }
-                        
-                        // Convert numeric strings to numbers for specific fields
-                        if (['odometer', 'initialOdometer', 'currentOdometer', 'quantity', 'pricePerUnit', 'totalCost', 'cost', 'amount', 'dueKM'].includes(key)) {
-                            value = value ? parseFloat(value) : 0;
-                        }
-                        
-                        // Convert boolean strings
-                        if (key === 'fullTank') {
-                            value = value === 'true' || value === true;
-                        }
-                        
-                        obj[key] = value;
-                    });
-                    return obj;
-                }).filter(obj => obj.id); // Only return rows with an ID
-            },
-
-            async addHeaders(spreadsheetId) {
-                const headers = {
-                    'Vehicles': ['ID', 'Name', 'Registration', 'Fuel Type', 'Initial Odometer', 'Current Odometer', 'Created At'],
-                    'Fuel Entries': ['ID', 'Vehicle ID', 'Date', 'Odometer', 'Driver ID', 'Fuel Type', 'Quantity', 'Price/Unit', 'Total Cost', 'Full Tank', 'Station', 'Notes', 'Has Photos', 'Created At'],
-                    'Service Records': ['ID', 'Vehicle ID', 'Date', 'Odometer', 'Driver ID', 'Service Type', 'Service Center', 'Cost', 'Notes', 'Has Photos', 'Created At'],
-                    'Expenses': ['ID', 'Vehicle ID', 'Date', 'Category', 'Amount', 'Notes', 'Has Photos', 'Created At'],
-                    'Reminders': ['ID', 'Vehicle ID', 'Type', 'Due Date', 'Due KM', 'Status', 'Notes', 'Created At'],
-                    'Drivers': ['ID', 'Name', 'Phone', 'Created At']
-                };
-
-                const requests = Object.entries(headers).map(([sheetName, headerRow]) => ({
-                    updateCells: {
-                        range: {
-                            sheetId: this.getSheetId(sheetName),
-                            startRowIndex: 0,
-                            endRowIndex: 1,
-                            startColumnIndex: 0,
-                            endColumnIndex: headerRow.length
-                        },
-                        rows: [{
-                            values: headerRow.map(header => ({
-                                userEnteredValue: { stringValue: header },
-                                userEnteredFormat: {
-                                    textFormat: { bold: true },
-                                    backgroundColor: { red: 0.9, green: 0.9, blue: 0.9 }
-                                }
-                            }))
-                        }],
-                        fields: 'userEnteredValue,userEnteredFormat(textFormat,backgroundColor)'
-                    }
-                }));
-
-                try {
-                    await gapi.client.sheets.spreadsheets.batchUpdate({
-                        spreadsheetId: spreadsheetId,
-                        resource: { requests }
-                    });
-                    console.log('✅ Headers added successfully');
-                } catch (error) {
-                    console.error('❌ Error adding headers:', error);
-                }
-            },
-
-            getSheetId(sheetName) {
-                const sheetIds = {
-                    'Vehicles': 0,
-                    'Fuel Entries': 1,
-                    'Service Records': 2,
-                    'Expenses': 3,
-                    'Reminders': 4,
-                    'Drivers': 5
-                };
-                return sheetIds[sheetName];
-            },
+getSheetId(sheetName) {
+    const sheetIds = {
+        'Vehicles': 0,
+        'Fuel Entries': 1,
+        'Service Records': 2,
+        'Expenses': 3,
+        'Reminders': 4,
+        'Drivers': 5
+    };
+    return sheetIds[sheetName];
+},
             setupAutoSync() {
                 setInterval(() => {
                     if (this.isOnline && this.syncPending) {
@@ -3061,6 +2911,132 @@
                     console.error(`Error syncing ${sheetName}:`, error);
                     throw error;
                 }
+            },
+
+            async handleSpreadsheet() {
+                const spreadsheetId = localStorage.getItem('spreadsheetId');
+                
+                if (!spreadsheetId) {
+                    // Create new spreadsheet
+                    console.log('📝 Creating new spreadsheet...');
+                    
+                    try {
+                        const response = await gapi.client.sheets.spreadsheets.create({
+                            properties: {
+                                title: `Car Expense Tracker - ${this.currentUser.email}`
+                            },
+                            sheets: [
+                                { properties: { title: 'Vehicles', gridProperties: { frozenRowCount: 1 } } },
+                                { properties: { title: 'Fuel Entries', gridProperties: { frozenRowCount: 1 } } },
+                                { properties: { title: 'Service Records', gridProperties: { frozenRowCount: 1 } } },
+                                { properties: { title: 'Expenses', gridProperties: { frozenRowCount: 1 } } },
+                                { properties: { title: 'Reminders', gridProperties: { frozenRowCount: 1 } } },
+                                { properties: { title: 'Drivers', gridProperties: { frozenRowCount: 1 } } }
+                            ]
+                        });
+                        
+                        const newId = response.result.spreadsheetId;
+                        localStorage.setItem('spreadsheetId', newId);
+                        console.log('✅ Spreadsheet created:', newId);
+                        console.log('📊 View at: https://docs.google.com/spreadsheets/d/' + newId);
+                        
+                        // Add headers
+                        await this.addSheetsHeaders(newId);
+                        
+                    } catch (error) {
+                        console.error('❌ Error creating spreadsheet:', error);
+                    }
+                } else {
+                    // Load existing data
+                    console.log('📊 Loading from spreadsheet:', spreadsheetId);
+                    await this.loadFromSheets(spreadsheetId);
+                }
+            },
+
+            async addSheetsHeaders(spreadsheetId) {
+                console.log('📋 Adding headers...');
+                
+                try {
+                    await gapi.client.sheets.spreadsheets.values.batchUpdate({
+                        spreadsheetId: spreadsheetId,
+                        resource: {
+                            valueInputOption: 'RAW',
+                            data: [
+                                { range: 'Vehicles!A1', values: [['ID', 'Name', 'Registration', 'Fuel Type', 'Initial Odometer', 'Current Odometer', 'Created At']] },
+                                { range: 'Fuel Entries!A1', values: [['ID', 'Vehicle ID', 'Date', 'Odometer', 'Driver ID', 'Fuel Type', 'Quantity', 'Price/Unit', 'Total Cost', 'Full Tank', 'Station', 'Notes', 'Has Photos', 'Created At']] },
+                                { range: 'Service Records!A1', values: [['ID', 'Vehicle ID', 'Date', 'Odometer', 'Driver ID', 'Service Type', 'Service Center', 'Cost', 'Notes', 'Has Photos', 'Created At']] },
+                                { range: 'Expenses!A1', values: [['ID', 'Vehicle ID', 'Date', 'Category', 'Amount', 'Notes', 'Has Photos', 'Created At']] },
+                                { range: 'Reminders!A1', values: [['ID', 'Vehicle ID', 'Type', 'Due Date', 'Due KM', 'Status', 'Notes', 'Created At']] },
+                                { range: 'Drivers!A1', values: [['ID', 'Name', 'Phone', 'Created At']] }
+                            ]
+                        }
+                    });
+                    
+                    // Format headers
+                    const formatRequests = [];
+                    for (let i = 0; i < 6; i++) {
+                        formatRequests.push({
+                            repeatCell: {
+                                range: { sheetId: i, startRowIndex: 0, endRowIndex: 1 },
+                                cell: {
+                                    userEnteredFormat: {
+                                        textFormat: { bold: true },
+                                        backgroundColor: { red: 0.9, green: 0.9, blue: 0.9 }
+                                    }
+                                },
+                                fields: 'userEnteredFormat'
+                            }
+                        });
+                    }
+                    
+                    await gapi.client.sheets.spreadsheets.batchUpdate({
+                        spreadsheetId: spreadsheetId,
+                        resource: { requests: formatRequests }
+                    });
+                    
+                    console.log('✅ Headers added with formatting');
+                } catch (error) {
+                    console.error('❌ Headers error:', error);
+                }
+            },
+
+            async loadFromSheets(spreadsheetId) {
+                console.log('📥 Loading data...');
+                
+                try {
+                    const response = await gapi.client.sheets.spreadsheets.values.batchGet({
+                        spreadsheetId: spreadsheetId,
+                        ranges: ['Vehicles!A2:G', 'Fuel Entries!A2:N', 'Service Records!A2:K', 'Expenses!A2:H', 'Reminders!A2:H', 'Drivers!A2:D']
+                    });
+                    
+                    const data = response.result.valueRanges;
+                    
+                    if (data[0]?.values) {
+                        this.vehicles = data[0].values.map(r => ({ id: r[0], name: r[1], regNo: r[2], fuelType: r[3], initialOdometer: parseFloat(r[4])||0, currentOdometer: parseFloat(r[5])||0, createdAt: r[6] }));
+                    }
+                    if (data[1]?.values) {
+                        this.fuelEntries = data[1].values.map(r => ({ id: r[0], vehicleId: r[1], date: r[2], odometer: parseFloat(r[3])||0, driverId: r[4], fuelType: r[5], quantity: parseFloat(r[6])||0, pricePerUnit: parseFloat(r[7])||0, totalCost: parseFloat(r[8])||0, fullTank: r[9]==='true', station: r[10], notes: r[11], photos: r[12]?JSON.parse(r[12]):[], createdAt: r[13] }));
+                    }
+                    if (data[2]?.values) {
+                        this.serviceEntries = data[2].values.map(r => ({ id: r[0], vehicleId: r[1], date: r[2], odometer: parseFloat(r[3])||0, driverId: r[4], serviceType: r[5], serviceCenter: r[6], cost: parseFloat(r[7])||0, notes: r[8], photos: r[9]?JSON.parse(r[9]):[], createdAt: r[10] }));
+                    }
+                    if (data[3]?.values) {
+                        this.expenses = data[3].values.map(r => ({ id: r[0], vehicleId: r[1], date: r[2], category: r[3], amount: parseFloat(r[4])||0, notes: r[5], photos: r[6]?JSON.parse(r[6]):[], createdAt: r[7] }));
+                    }
+                    if (data[4]?.values) {
+                        this.reminders = data[4].values.map(r => ({ id: r[0], vehicleId: r[1], type: r[2], dueDate: r[3], dueKM: r[4], status: r[5], notes: r[6], createdAt: r[7] }));
+                    }
+                    if (data[5]?.values) {
+                        this.drivers = data[5].values.map(r => ({ id: r[0], name: r[1], phone: r[2], createdAt: r[3] }));
+                    }
+                    
+                    this.saveData();
+                    console.log(`✅ Loaded: ${this.vehicles.length} vehicles, ${this.fuelEntries.length} fuel, ${this.serviceEntries.length} service, ${this.drivers.length} drivers`);
+                } catch (error) {
+                    console.error('❌ Load error:', error);
+                }
+            },
+            
             },            
         };
 
@@ -3073,7 +3049,7 @@
         }
 
         // Global callback for Google Sign-In
-        function handleCredentialResponse(response) {
+        async function handleCredentialResponse(response) {
             console.log('✅ Sign-in successful!');
             
             try {
@@ -3095,12 +3071,56 @@
                 localStorage.setItem('carExpenseUser', JSON.stringify(app.currentUser));
                 console.log('👤 Logged in as:', userInfo.email);
                 
-                // Initialize Google Sheets API with OAuth token
-                app.initializeGoogleSheets(response.credential);
+                // IMMEDIATELY hide login screen and show vehicle screen
+                document.getElementById('loginScreen').classList.remove('active');
+                document.getElementById('bottomNav').style.display = 'flex';
+                
+                // Request Google Sheets access with token client
+                console.log('🔄 Requesting Google Sheets access...');
+                
+                const tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: '493056886974-suc8d0ljpjtarb4cs8td664dm0da7ibn.apps.googleusercontent.com',
+                    scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file',
+                    callback: async (tokenResponse) => {
+                        if (tokenResponse.error) {
+                            console.error('❌ Token error:', tokenResponse.error);
+                            console.log('⚠️ Continuing without Google Sheets');
+                            app.showVehicleSelection();
+                            return;
+                        }
+                        
+                        console.log('✅ Sheets access token received');
+                        
+                        // Initialize Google API client
+                        await new Promise((resolve) => {
+                            gapi.load('client', () => {
+                                console.log('✅ GAPI client loaded');
+                                resolve();
+                            });
+                        });
+                        
+                        // Initialize Sheets API
+                        await gapi.client.init({
+                            discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4']
+                        });
+                        
+                        gapi.client.setToken({ access_token: tokenResponse.access_token });
+                        console.log('✅ Google Sheets API ready');
+                        
+                        // Create or load spreadsheet
+                        await app.handleSpreadsheet();
+                        
+                        // Show vehicle selection with loaded data
+                        app.showVehicleSelection();
+                    }
+                });
+                
+                // Request the token (shows permissions popup)
+                tokenClient.requestAccessToken({ prompt: '' });
                 
             } catch (error) {
-                console.error('❌ Error processing sign-in:', error);
-                alert('Sign-in failed. Please try again.');
+                console.error('❌ Error in sign-in:', error);
+                alert('Sign-in error. Check console.');
             }
         }
 
